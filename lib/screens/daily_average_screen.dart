@@ -19,7 +19,9 @@ class _DailyAverageScreenState extends State<DailyAverageScreen> {
   String? _result;
 
   void _calculate() {
-    final days = double.tryParse(_daysController.text.trim());
+    final days = double.tryParse(
+      _daysController.text.trim(),
+    );
 
     if (days == null || days <= 0) {
       setState(() {
@@ -29,7 +31,9 @@ class _DailyAverageScreenState extends State<DailyAverageScreen> {
     }
 
     if (_type == AverageType.count) {
-      final value = double.tryParse(_valueController.text.trim());
+      final value = double.tryParse(
+        _valueController.text.trim(),
+      );
 
       if (value == null || value < 0) {
         setState(() {
@@ -76,21 +80,29 @@ class _DailyAverageScreenState extends State<DailyAverageScreen> {
 
     return Scaffold(
       backgroundColor: AppTheme.background,
+
       appBar: AppBar(
         title: const Text('দৈনিক গড়'),
         actions: [
           IconButton(
             onPressed: _clear,
             tooltip: 'মুছে ফেলুন',
-            icon: const Icon(Icons.refresh_rounded),
+            icon: const Icon(
+              Icons.refresh_rounded,
+            ),
           ),
         ],
       ),
+
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(18),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            // =========================
+            // HEADER CARD
+            // =========================
+
             Card(
               child: Padding(
                 padding: const EdgeInsets.all(20),
@@ -101,17 +113,21 @@ class _DailyAverageScreenState extends State<DailyAverageScreen> {
                       color: AppTheme.gold,
                       size: 46,
                     ),
+
                     const SizedBox(height: 12),
-                    const Text(
+
+                    Text(
                       'দৈনিক গড় হিসাব',
                       style: TextStyle(
-                        color: AppTheme.textDark,
+                        color: AppTheme.textPrimary,
                         fontSize: 20,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
+
                     const SizedBox(height: 8),
-                    const Text(
+
+                    Text(
                       'মোট দিনের ভিত্তিতে দৈনিক গড় বের করুন',
                       textAlign: TextAlign.center,
                       style: TextStyle(
@@ -125,6 +141,10 @@ class _DailyAverageScreenState extends State<DailyAverageScreen> {
             ),
 
             const SizedBox(height: 18),
+
+            // =========================
+            // INPUT CARD
+            // =========================
 
             Card(
               child: Padding(
@@ -147,12 +167,16 @@ class _DailyAverageScreenState extends State<DailyAverageScreen> {
                       segments: const [
                         ButtonSegment<AverageType>(
                           value: AverageType.count,
-                          icon: Icon(Icons.numbers_rounded),
+                          icon: Icon(
+                            Icons.numbers_rounded,
+                          ),
                           label: Text('সংখ্যা'),
                         ),
                         ButtonSegment<AverageType>(
                           value: AverageType.time,
-                          icon: Icon(Icons.access_time_rounded),
+                          icon: Icon(
+                            Icons.access_time_rounded,
+                          ),
                           label: Text('সময়'),
                         ),
                       ],
@@ -168,18 +192,24 @@ class _DailyAverageScreenState extends State<DailyAverageScreen> {
                         foregroundColor:
                             WidgetStateProperty.resolveWith<Color?>(
                           (states) {
-                            if (states.contains(WidgetState.selected)) {
+                            if (states.contains(
+                              WidgetState.selected,
+                            )) {
                               return Colors.black;
                             }
-                            return AppTheme.textDark;
+
+                            return AppTheme.textPrimary;
                           },
                         ),
                         backgroundColor:
                             WidgetStateProperty.resolveWith<Color?>(
                           (states) {
-                            if (states.contains(WidgetState.selected)) {
+                            if (states.contains(
+                              WidgetState.selected,
+                            )) {
                               return AppTheme.gold;
                             }
+
                             return AppTheme.cardLight;
                           },
                         ),
@@ -190,7 +220,8 @@ class _DailyAverageScreenState extends State<DailyAverageScreen> {
 
                     TextField(
                       controller: _daysController,
-                      keyboardType: const TextInputType.numberWithOptions(
+                      keyboardType:
+                          const TextInputType.numberWithOptions(
                         decimal: true,
                       ),
                       decoration: const InputDecoration(
@@ -206,16 +237,17 @@ class _DailyAverageScreenState extends State<DailyAverageScreen> {
 
                     TextField(
                       controller: _valueController,
-                      keyboardType: isTime
-                          ? const TextInputType.numberWithOptions(
-                              decimal: true,
-                            )
-                          : const TextInputType.numberWithOptions(
-                              decimal: true,
-                            ),
+                      keyboardType:
+                          const TextInputType.numberWithOptions(
+                        decimal: true,
+                      ),
                       decoration: InputDecoration(
-                        labelText: isTime ? 'মোট সময়' : 'মোট সংখ্যা',
-                        hintText: isTime ? 'যেমন: 25.30' : 'যেমন: 100',
+                        labelText: isTime
+                            ? 'মোট সময়'
+                            : 'মোট সংখ্যা',
+                        hintText: isTime
+                            ? 'যেমন: 25.30'
+                            : 'যেমন: 100',
                         prefixIcon: Icon(
                           isTime
                               ? Icons.schedule_rounded
@@ -226,7 +258,8 @@ class _DailyAverageScreenState extends State<DailyAverageScreen> {
 
                     if (isTime) ...[
                       const SizedBox(height: 8),
-                      const Text(
+
+                      Text(
                         'সময় ঘণ্টা.মিনিট ফরম্যাটে লিখুন। যেমন: 25.30',
                         style: TextStyle(
                           color: AppTheme.textMuted,
@@ -239,13 +272,19 @@ class _DailyAverageScreenState extends State<DailyAverageScreen> {
 
                     ElevatedButton.icon(
                       onPressed: _calculate,
-                      icon: const Icon(Icons.calculate_rounded),
+                      icon: const Icon(
+                        Icons.calculate_rounded,
+                      ),
                       label: const Text('হিসাব করুন'),
                     ),
                   ],
                 ),
               ),
             ),
+
+            // =========================
+            // RESULT
+            // =========================
 
             if (_result != null) ...[
               const SizedBox(height: 18),
@@ -260,15 +299,19 @@ class _DailyAverageScreenState extends State<DailyAverageScreen> {
                         color: AppTheme.gold,
                         size: 46,
                       ),
+
                       const SizedBox(height: 10),
-                      const Text(
+
+                      Text(
                         'দৈনিক গড়',
                         style: TextStyle(
                           color: AppTheme.textMuted,
                           fontSize: 15,
                         ),
                       ),
+
                       const SizedBox(height: 8),
+
                       Text(
                         _result!,
                         textAlign: TextAlign.center,
@@ -278,9 +321,12 @@ class _DailyAverageScreenState extends State<DailyAverageScreen> {
                           fontWeight: FontWeight.bold,
                         ),
                       ),
+
                       if (!isTime)
-                        const Padding(
-                          padding: EdgeInsets.only(top: 6),
+                        Padding(
+                          padding: const EdgeInsets.only(
+                            top: 6,
+                          ),
                           child: Text(
                             'প্রতিদিন',
                             style: TextStyle(
