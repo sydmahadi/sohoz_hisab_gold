@@ -32,13 +32,28 @@ class AppTheme {
   static const Color danger = Color(0xFF9B3D35);
 
   // ─────────────────────────────────────────────
-  // Compile-time Safe Constants (Fixes GitHub Build Errors)
+  // Light Theme Specific Colors (Premium Look)
   // ─────────────────────────────────────────────
-  static const Color background = backgroundDark;
-  static const Color backgroundSecondary = backgroundSecondaryDark;
-  static const Color cardColor = cardColorDark;
-  static const Color cardLight = cardLightDark;
-  static const Color textMuted = textMutedDark;
+  static const Color backgroundLight = Color(0xFFF2F5F3);
+  static const Color cardColorLight = Colors.white;
+  static const Color cardLightLight = Color(0xFFE8ECE9);
+  static const Color textLight = Color(0xFF1C2D27);
+  static const Color textMutedLight = Color(0xFF5A6E65);
+
+  // ─────────────────────────────────────────────
+  // Dynamic Helper Getters (Screen-এ ব্যবহারের জন্য)
+  // ─────────────────────────────────────────────
+  static Color get background =>
+      themeNotifier.value == ThemeMode.dark ? backgroundDark : backgroundLight;
+
+  static Color get cardColor =>
+      themeNotifier.value == ThemeMode.dark ? cardColorDark : cardColorLight;
+
+  static Color get cardLight =>
+      themeNotifier.value == ThemeMode.dark ? cardLightDark : cardLightLight;
+
+  static Color get textMuted =>
+      themeNotifier.value == ThemeMode.dark ? textMutedDark : textMutedLight;
 
   // ─────────────────────────────────────────────
   // 1. Dark Theme
@@ -85,6 +100,12 @@ class AppTheme {
             width: 0.5,
           ),
         ),
+      ),
+      bottomNavigationBarTheme: const BottomNavigationBarThemeData(
+        backgroundColor: cardColorDark,
+        selectedItemColor: gold,
+        unselectedItemColor: textMutedDark,
+        elevation: 8,
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
@@ -166,84 +187,90 @@ class AppTheme {
   }
 
   // ─────────────────────────────────────────────
-  // 2. Light Theme
+  // 2. Light Theme (Refined & Vibrant)
   // ─────────────────────────────────────────────
   static ThemeData get lightTheme {
     return ThemeData(
       useMaterial3: true,
       brightness: Brightness.light,
-      scaffoldBackgroundColor: const Color(0xFFF4F6F5),
+      scaffoldBackgroundColor: backgroundLight,
       colorScheme: ColorScheme.fromSeed(
-        seedColor: primary,
+        seedColor: darkGreen,
         brightness: Brightness.light,
       ).copyWith(
         primary: darkGreen,
         onPrimary: Colors.white,
         secondary: gold,
         onSecondary: Colors.white,
-        surface: Colors.white,
-        onSurface: Colors.black87,
+        surface: cardColorLight,
+        onSurface: textLight,
         error: danger,
       ),
       appBarTheme: const AppBarTheme(
         backgroundColor: Colors.white,
-        foregroundColor: Colors.black87,
+        foregroundColor: textLight,
         centerTitle: true,
         elevation: 0,
         scrolledUnderElevation: 0,
         surfaceTintColor: Colors.transparent,
         titleTextStyle: TextStyle(
-          color: Colors.black87,
+          color: darkGreen,
           fontSize: 20,
           fontWeight: FontWeight.w800,
         ),
       ),
       cardTheme: CardThemeData(
-        color: Colors.white,
+        color: cardColorLight,
         elevation: 2,
-        shadowColor: Colors.black12,
+        shadowColor: Colors.black.withAlpha(15),
         margin: EdgeInsets.zero,
         surfaceTintColor: Colors.transparent,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(22),
           side: const BorderSide(
-            color: Color(0xFFE0E0E0),
-            width: 0.8,
+            color: Color(0xFFDDE3E0),
+            width: 1,
           ),
         ),
       ),
+      bottomNavigationBarTheme: const BottomNavigationBarThemeData(
+        backgroundColor: Colors.white,
+        selectedItemColor: darkGreen,
+        unselectedItemColor: textMutedLight,
+        elevation: 8,
+      ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
-        fillColor: Colors.white,
+        fillColor: cardLightLight,
         contentPadding: const EdgeInsets.symmetric(
           horizontal: 18,
           vertical: 17,
         ),
         labelStyle: const TextStyle(
-          color: Colors.black54,
+          color: textMutedLight,
           fontWeight: FontWeight.w500,
         ),
-        hintStyle: const TextStyle(color: Colors.black38),
+        hintStyle: const TextStyle(color: textMutedLight),
         prefixIconColor: darkGreen,
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(17),
           borderSide: const BorderSide(
-            color: Color(0xFFCCCCCC),
-            width: 0.8,
+            color: Color(0xFFCBD5D0),
+            width: 1,
           ),
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(17),
           borderSide: const BorderSide(
-            color: Color(0xFFCCCCCC),
-            width: 0.8,
+            color: Color(0xFFCBD5D0),
+            width: 1,
           ),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(17),
           borderSide: const BorderSide(
             color: darkGreen,
-            width: 1.4,
+            width: 1.5,
           ),
         ),
       ),
@@ -271,20 +298,20 @@ class AppTheme {
       ),
       iconTheme: const IconThemeData(color: darkGreen),
       dividerTheme: const DividerThemeData(
-        color: Color(0xFFE0E0E0),
+        color: Color(0xFFE2E8E5),
         thickness: 1,
         space: 1,
       ),
       textTheme: const TextTheme(
-        displayLarge: TextStyle(color: Colors.black87, fontWeight: FontWeight.w800),
-        displayMedium: TextStyle(color: Colors.black87, fontWeight: FontWeight.w800),
-        headlineLarge: TextStyle(color: Colors.black87, fontWeight: FontWeight.w800),
-        headlineMedium: TextStyle(color: Colors.black87, fontWeight: FontWeight.w700),
-        titleLarge: TextStyle(color: Colors.black87, fontWeight: FontWeight.w800),
-        titleMedium: TextStyle(color: Colors.black87, fontWeight: FontWeight.w700),
-        bodyLarge: TextStyle(color: Colors.black87),
-        bodyMedium: TextStyle(color: Colors.black87),
-        bodySmall: TextStyle(color: Colors.black54),
+        displayLarge: TextStyle(color: textLight, fontWeight: FontWeight.w800),
+        displayMedium: TextStyle(color: textLight, fontWeight: FontWeight.w800),
+        headlineLarge: TextStyle(color: textLight, fontWeight: FontWeight.w800),
+        headlineMedium: TextStyle(color: textLight, fontWeight: FontWeight.w700),
+        titleLarge: TextStyle(color: textLight, fontWeight: FontWeight.w800),
+        titleMedium: TextStyle(color: textLight, fontWeight: FontWeight.w700),
+        bodyLarge: TextStyle(color: textLight),
+        bodyMedium: TextStyle(color: textLight),
+        bodySmall: TextStyle(color: textMutedLight),
       ),
     );
   }
