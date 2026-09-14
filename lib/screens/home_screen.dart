@@ -1,5 +1,4 @@
 import 'dart:math' as math;
-
 import 'package:flutter/material.dart';
 
 import '../theme/app_theme.dart';
@@ -23,23 +22,16 @@ class HomeScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return ValueListenableBuilder<ThemeMode>(
       valueListenable: AppTheme.themeNotifier,
-      builder: (context, themeMode, child) {
-        final isDark = themeMode == ThemeMode.dark;
-
+      builder: (context, themeMode, _) {
         return Scaffold(
           backgroundColor: AppTheme.background,
           body: Stack(
             children: [
-              // =================================================
-              // ISLAMIC BACKGROUND
-              // =================================================
-
+              // Islamic geometric background
               Positioned.fill(
-                child: IgnorePointer(
-                  child: CustomPaint(
-                    painter: IslamicHomePainter(
-                      isDark: isDark,
-                    ),
+                child: CustomPaint(
+                  painter: IslamicBackgroundPainter(
+                    color: AppTheme.gold.withValues(alpha: 0.055),
                   ),
                 ),
               ),
@@ -47,255 +39,352 @@ class HomeScreen extends StatelessWidget {
               SafeArea(
                 child: Column(
                   children: [
-                    _buildHeader(
-                      context,
-                      themeMode,
-                    ),
-
-                    const SizedBox(height: 5),
-
-                    // =================================================
-                    // MENU
-                    // =================================================
-
-                    Expanded(
-                      child: GridView.count(
-                        padding: const EdgeInsets.fromLTRB(
-                          12,
-                          8,
-                          12,
-                          10,
-                        ),
-                        crossAxisCount: 3,
-                        crossAxisSpacing: 9,
-                        mainAxisSpacing: 9,
-                        childAspectRatio: 0.95,
-                        children: [
-                          // 1
-                          _MenuCard(
-                            title: 'মানি ম্যানেজার',
-                            icon: Icons.account_balance_wallet_rounded,
-                            color: AppTheme.gold,
-                            onTap: () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) =>
-                                      const MoneyManagerScreen(),
-                                ),
-                              );
-                            },
-                          ),
-
-                          // 2
-                          _MenuCard(
-                            title: 'এন্ট্রি করুন',
-                            icon: Icons.edit_note_rounded,
-                            color: AppTheme.green,
-                            onTap: () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) =>
-                                      const EntryScreen(),
-                                ),
-                              );
-                            },
-                          ),
-
-                          // 3
-                          _MenuCard(
-                            title: 'তথ্য দেখুন',
-                            icon: Icons.info_rounded,
-                            color: AppTheme.gold,
-                            onTap: () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) =>
-                                      const InfoScreen(),
-                                ),
-                              );
-                            },
-                          ),
-
-                          // 4
-                          _MenuCard(
-                            title: 'নোট',
-                            icon: Icons.note_alt_rounded,
-                            color: AppTheme.green,
-                            onTap: () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) =>
-                                      const NoteScreen(),
-                                ),
-                              );
-                            },
-                          ),
-
-                          // 5
-                          _MenuCard(
-                            title: 'ক্যালকুলেটর',
-                            icon: Icons.calculate_rounded,
-                            color: AppTheme.gold,
-                            onTap: () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) =>
-                                      const CalculatorScreen(),
-                                ),
-                              );
-                            },
-                          ),
-
-                          // 6
-                          _MenuCard(
-                            title: 'ক্যালেন্ডার',
-                            icon: Icons.calendar_month_rounded,
-                            color: AppTheme.green,
-                            onTap: () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) =>
-                                      const CalendarScreen(),
-                                ),
-                              );
-                            },
-                          ),
-
-                          // 7
-                          _MenuCard(
-                            title: 'তারিখ হিসাব',
-                            icon: Icons.date_range_rounded,
-                            color: AppTheme.gold,
-                            onTap: () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) =>
-                                      const DateCalculatorScreen(),
-                                ),
-                              );
-                            },
-                          ),
-
-                          // 8
-                          _MenuCard(
-                            title: 'সময় যোগ',
-                            icon: Icons.access_time_filled_rounded,
-                            color: AppTheme.green,
-                            onTap: () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) =>
-                                      const TimeSumScreen(),
-                                ),
-                              );
-                            },
-                          ),
-
-                          // 9
-                          _MenuCard(
-                            title: 'দৈনিক গড়',
-                            icon: Icons.today_rounded,
-                            color: AppTheme.gold,
-                            onTap: () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) =>
-                                      const DailyAverageScreen(),
-                                ),
-                              );
-                            },
-                          ),
-
-                          // 10
-                          _MenuCard(
-                            title: 'মাসিক গড়',
-                            icon: Icons.calendar_view_month_rounded,
-                            color: AppTheme.green,
-                            onTap: () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) =>
-                                      const MonthlyAverageScreen(),
-                                ),
-                              );
-                            },
-                          ),
-
-                          // 11
-                          _MenuCard(
-                            title: 'ব্রাউজার',
-                            icon: Icons.language_rounded,
-                            color: AppTheme.gold,
-                            onTap: () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) =>
-                                      const BrowserScreen(),
-                                ),
-                              );
-                            },
-                          ),
-
-                          // 12
-                          _MenuCard(
-                            title: 'অ্যাপ সম্পর্কে',
-                            icon: Icons.auto_awesome_rounded,
-                            color: AppTheme.gold,
-                            onTap: () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) =>
-                                      const AboutScreen(),
-                                ),
-                              );
-                            },
-                          ),
-                        ],
-                      ),
-                    ),
-
-                    // =================================================
-                    // FOOTER
-                    // =================================================
-
+                    // ═══════════════════════════════════════
+                    // HEADER
+                    // ═══════════════════════════════════════
                     Padding(
                       padding: const EdgeInsets.fromLTRB(
+                        14,
                         12,
-                        2,
-                        12,
-                        9,
+                        14,
+                        4,
                       ),
-                      child: Column(
+                      child: Row(
                         children: [
-                          Container(
-                            width: 65,
-                            height: 1,
-                            color: AppTheme.gold.withValues(
-                              alpha: 0.45,
-                            ),
+                          const Spacer(),
+
+                          Column(
+                            children: [
+                              // Bismillah
+                              Text(
+                                'بِسْمِ اللَّهِ الرَّحْمَنِ الرَّحِيمِ',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  color: AppTheme.goldLight,
+                                  fontSize: 21,
+                                  fontWeight: FontWeight.w600,
+                                  height: 1.4,
+                                  letterSpacing: 0.2,
+                                ),
+                              ),
+
+                              const SizedBox(height: 7),
+
+                              // App name
+                              Text(
+                                'সহজ হিসাব গোল্ড',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  color: AppTheme.textPrimary,
+                                  fontSize: 27,
+                                  fontWeight: FontWeight.bold,
+                                  letterSpacing: 0.2,
+                                ),
+                              ),
+
+                              const SizedBox(height: 4),
+
+                              // Subtitle
+                              Text(
+                                'প্রয়োজনীয় সব হিসাব ও ইউটিলিটি এক জায়গায়',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  color: AppTheme.textMuted,
+                                  fontSize: 12.5,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ],
                           ),
-                          const SizedBox(height: 5),
-                          Text(
-                            'Developed by Talpatar Sepai',
-                            style: TextStyle(
-                              color: AppTheme.textMuted,
-                              fontSize: 10.5,
-                              fontWeight: FontWeight.w500,
+
+                          const Spacer(),
+
+                          // Theme button
+                          Container(
+                            width: 40,
+                            height: 40,
+                            decoration: BoxDecoration(
+                              color: AppTheme.cardColor,
+                              shape: BoxShape.circle,
+                              border: Border.all(
+                                color: AppTheme.gold.withValues(
+                                  alpha: 0.40,
+                                ),
+                              ),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withValues(
+                                    alpha: AppTheme.isDark ? 0.20 : 0.06,
+                                  ),
+                                  blurRadius: 8,
+                                  offset: const Offset(0, 3),
+                                ),
+                              ],
+                            ),
+                            child: IconButton(
+                              padding: EdgeInsets.zero,
+                              iconSize: 20,
+                              onPressed: () {
+                                AppTheme.toggleTheme();
+                              },
+                              icon: Icon(
+                                AppTheme.isDark
+                                    ? Icons.light_mode_rounded
+                                    : Icons.dark_mode_rounded,
+                                color: AppTheme.gold,
+                              ),
                             ),
                           ),
                         ],
+                      ),
+                    ),
+
+                    const SizedBox(height: 12),
+
+                    // ═══════════════════════════════════════
+                    // DECORATIVE DIVIDER
+                    // ═══════════════════════════════════════
+                    Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 35,
+                      ),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Container(
+                              height: 1,
+                              color: AppTheme.gold.withValues(
+                                alpha: 0.22,
+                              ),
+                            ),
+                          ),
+                          Padding(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                            ),
+                            child: Icon(
+                              Icons.diamond_outlined,
+                              size: 13,
+                              color: AppTheme.gold.withValues(
+                                alpha: 0.70,
+                              ),
+                            ),
+                          ),
+                          Expanded(
+                            child: Container(
+                              height: 1,
+                              color: AppTheme.gold.withValues(
+                                alpha: 0.22,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    // ═══════════════════════════════════════
+                    // BUTTON GRID
+                    // ═══════════════════════════════════════
+                    Expanded(
+                      child: Center(
+                        child: SingleChildScrollView(
+                          padding: const EdgeInsets.fromLTRB(
+                            12,
+                            18,
+                            12,
+                            12,
+                          ),
+                          child: GridView.count(
+                            shrinkWrap: true,
+                            physics:
+                                const NeverScrollableScrollPhysics(),
+                            crossAxisCount: 3,
+                            crossAxisSpacing: 10,
+                            mainAxisSpacing: 10,
+                            childAspectRatio: 0.92,
+                            children: [
+                              // 1
+                              _MenuCard(
+                                icon: Icons.account_balance_wallet_rounded,
+                                title: 'মানি ম্যানেজার',
+                                onTap: () {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) =>
+                                          const MoneyManagerScreen(),
+                                    ),
+                                  );
+                                },
+                              ),
+
+                              // 2
+                              _MenuCard(
+                                icon: Icons.edit_note_rounded,
+                                title: 'এন্ট্রি করুন',
+                                onTap: () {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) =>
+                                          const EntryScreen(),
+                                    ),
+                                  );
+                                },
+                              ),
+
+                              // 3
+                              _MenuCard(
+                                icon: Icons.menu_book_rounded,
+                                title: 'তথ্য দেখুন',
+                                onTap: () {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) =>
+                                          const InfoScreen(),
+                                    ),
+                                  );
+                                },
+                              ),
+
+                              // 4
+                              _MenuCard(
+                                icon: Icons.note_alt_rounded,
+                                title: 'নোট',
+                                onTap: () {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) =>
+                                          const NoteScreen(),
+                                    ),
+                                  );
+                                },
+                              ),
+
+                              // 5
+                              _MenuCard(
+                                icon: Icons.calculate_rounded,
+                                title: 'ক্যালকুলেটর',
+                                onTap: () {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) =>
+                                          const CalculatorScreen(),
+                                    ),
+                                  );
+                                },
+                              ),
+
+                              // 6
+                              _MenuCard(
+                                icon: Icons.calendar_month_rounded,
+                                title: 'ক্যালেন্ডার',
+                                onTap: () {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) =>
+                                          const CalendarScreen(),
+                                    ),
+                                  );
+                                },
+                              ),
+
+                              // 7
+                              _MenuCard(
+                                icon: Icons.event_available_rounded,
+                                title: 'তারিখ হিসাব',
+                                onTap: () {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) =>
+                                          const DateCalculatorScreen(),
+                                    ),
+                                  );
+                                },
+                              ),
+
+                              // 8
+                              _MenuCard(
+                                icon: Icons.access_time_filled_rounded,
+                                title: 'সময় যোগ',
+                                onTap: () {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) =>
+                                          const TimeSumScreen(),
+                                    ),
+                                  );
+                                },
+                              ),
+
+                              // 9
+                              _MenuCard(
+                                icon: Icons.speed_rounded,
+                                title: 'দৈনিক গড়',
+                                onTap: () {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) =>
+                                          const DailyAverageScreen(),
+                                    ),
+                                  );
+                                },
+                              ),
+
+                              // 10
+                              _MenuCard(
+                                icon: Icons.date_range_rounded,
+                                title: 'মাসিক গড়',
+                                onTap: () {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) =>
+                                          const MonthlyAverageScreen(),
+                                    ),
+                                  );
+                                },
+                              ),
+
+                              // 11
+                              _MenuCard(
+                                icon: Icons.language_rounded,
+                                title: 'ব্রাউজার',
+                                onTap: () {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) =>
+                                          const BrowserScreen(),
+                                    ),
+                                  );
+                                },
+                              ),
+
+                              // 12
+                              _MenuCard(
+                                icon: Icons.info_outline_rounded,
+                                title: 'অ্যাপ সম্পর্কে',
+                                onTap: () {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) =>
+                                          const AboutScreen(),
+                                    ),
+                                  );
+                                },
+                              ),
+                            ],
+                          ),
+                        ),
                       ),
                     ),
                   ],
@@ -307,386 +396,164 @@ class HomeScreen extends StatelessWidget {
       },
     );
   }
-
-  // =============================================================
-  // PREMIUM HEADER
-  // =============================================================
-
-  Widget _buildHeader(
-    BuildContext context,
-    ThemeMode themeMode,
-  ) {
-    final isDark = themeMode == ThemeMode.dark;
-
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(
-        12,
-        10,
-        12,
-        0,
-      ),
-      child: Container(
-        padding: const EdgeInsets.fromLTRB(
-          14,
-          12,
-          6,
-          12,
-        ),
-        decoration: BoxDecoration(
-          color: AppTheme.cardColor.withValues(
-            alpha: isDark ? 0.94 : 0.97,
-          ),
-          borderRadius: BorderRadius.circular(22),
-          border: Border.all(
-            color: AppTheme.gold.withValues(
-              alpha: 0.38,
-            ),
-            width: 1,
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(
-                alpha: isDark ? 0.20 : 0.07,
-              ),
-              blurRadius: 18,
-              offset: const Offset(0, 6),
-            ),
-          ],
-        ),
-        child: Row(
-          children: [
-            // =================================================
-            // ISLAMIC EMBLEM
-            // =================================================
-
-            Container(
-              width: 55,
-              height: 55,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: AppTheme.gold.withValues(
-                  alpha: 0.08,
-                ),
-                border: Border.all(
-                  color: AppTheme.gold.withValues(
-                    alpha: 0.50,
-                  ),
-                  width: 1,
-                ),
-              ),
-              child: Stack(
-                alignment: Alignment.center,
-                children: [
-                  Transform.rotate(
-                    angle: math.pi / 4,
-                    child: Container(
-                      width: 30,
-                      height: 30,
-                      decoration: BoxDecoration(
-                        border: Border.all(
-                          color: AppTheme.gold.withValues(
-                            alpha: 0.75,
-                          ),
-                          width: 1.1,
-                        ),
-                      ),
-                    ),
-                  ),
-                  Transform.rotate(
-                    angle: -math.pi / 4,
-                    child: Container(
-                      width: 30,
-                      height: 30,
-                      decoration: BoxDecoration(
-                        border: Border.all(
-                          color: AppTheme.gold.withValues(
-                            alpha: 0.35,
-                          ),
-                          width: 1,
-                        ),
-                      ),
-                    ),
-                  ),
-                  const Icon(
-                    Icons.auto_awesome_rounded,
-                    color: AppTheme.gold,
-                    size: 21,
-                  ),
-                ],
-              ),
-            ),
-
-            const SizedBox(width: 11),
-
-            // =================================================
-            // TITLE
-            // =================================================
-
-            Expanded(
-              child: Column(
-                crossAxisAlignment:
-                    CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'بِسْمِ اللَّهِ الرَّحْمَنِ الرَّحِيمِ',
-                    style: TextStyle(
-                      color: AppTheme.goldLight,
-                      fontSize: 11.5,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-
-                  const SizedBox(height: 4),
-
-                  Text(
-                    'সহজ হিসাব গোল্ড',
-                    style: TextStyle(
-                      color: AppTheme.textPrimary,
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-
-                  const SizedBox(height: 2),
-
-                  Text(
-                    'প্রয়োজনীয় সব হিসাব এক জায়গায়',
-                    style: TextStyle(
-                      color: AppTheme.textMuted,
-                      fontSize: 9.5,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-
-            // =================================================
-            // THEME BUTTON
-            // =================================================
-
-            Container(
-              decoration: BoxDecoration(
-                color: AppTheme.gold.withValues(
-                  alpha: 0.08,
-                ),
-                borderRadius:
-                    BorderRadius.circular(14),
-                border: Border.all(
-                  color: AppTheme.gold.withValues(
-                    alpha: 0.15,
-                  ),
-                ),
-              ),
-              child: IconButton(
-                tooltip: 'থিম পরিবর্তন',
-                onPressed: () {
-                  AppTheme.themeNotifier.value =
-                      isDark
-                          ? ThemeMode.light
-                          : ThemeMode.dark;
-                },
-                icon: AnimatedSwitcher(
-                  duration:
-                      const Duration(milliseconds: 250),
-                  child: Icon(
-                    isDark
-                        ? Icons.light_mode_rounded
-                        : Icons.dark_mode_rounded,
-                    key: ValueKey(isDark),
-                    color: AppTheme.gold,
-                    size: 20,
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
 }
 
-// =================================================================
-// MENU CARD
-// =================================================================
+
+// ═══════════════════════════════════════════════════════════════
+// PREMIUM MENU CARD
+// ═══════════════════════════════════════════════════════════════
 
 class _MenuCard extends StatelessWidget {
-  final String title;
   final IconData icon;
-  final Color color;
+  final String title;
   final VoidCallback onTap;
 
   const _MenuCard({
-    required this.title,
     required this.icon,
-    required this.color,
+    required this.title,
     required this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
+    final bool dark = AppTheme.isDark;
+
     return Material(
       color: Colors.transparent,
       child: InkWell(
         onTap: onTap,
-        borderRadius:
-            BorderRadius.circular(18),
-        splashColor:
-            color.withValues(alpha: 0.12),
-        child: Container(
+        borderRadius: BorderRadius.circular(18),
+        splashColor: AppTheme.gold.withValues(
+          alpha: 0.12,
+        ),
+        highlightColor: AppTheme.gold.withValues(
+          alpha: 0.05,
+        ),
+        child: Ink(
           decoration: BoxDecoration(
-            color: AppTheme.cardColor.withValues(
-              alpha: AppTheme.isDark
-                  ? 0.91
-                  : 0.97,
-            ),
-            borderRadius:
-                BorderRadius.circular(18),
+            color: AppTheme.cardColor,
+            borderRadius: BorderRadius.circular(18),
             border: Border.all(
-              color: color.withValues(
-                alpha: 0.28,
+              color: AppTheme.gold.withValues(
+                alpha: dark ? 0.40 : 0.28,
               ),
-              width: 1,
+              width: 0.9,
             ),
             boxShadow: [
               BoxShadow(
                 color: Colors.black.withValues(
-                  alpha: AppTheme.isDark
-                      ? 0.14
-                      : 0.045,
+                  alpha: dark ? 0.30 : 0.07,
                 ),
-                blurRadius: 9,
-                offset: const Offset(0, 3),
+                blurRadius: dark ? 12 : 8,
+                offset: const Offset(0, 4),
               ),
             ],
           ),
-          child: Stack(
-            children: [
-              // =================================================
-              // CORNER GEOMETRY
-              // =================================================
-
-              Positioned(
-                top: -10,
-                right: -10,
-                child: Transform.rotate(
-                  angle: math.pi / 4,
-                  child: Container(
-                    width: 31,
-                    height: 31,
-                    decoration: BoxDecoration(
-                      border: Border.all(
-                        color: color.withValues(
-                          alpha: 0.10,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-
-              Positioned(
-                bottom: -10,
-                left: -10,
-                child: Transform.rotate(
-                  angle: math.pi / 4,
-                  child: Container(
-                    width: 26,
-                    height: 26,
-                    decoration: BoxDecoration(
-                      border: Border.all(
-                        color: color.withValues(
-                          alpha: 0.07,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-
-              // =================================================
-              // ICON + TITLE
-              // =================================================
-
-              Center(
-                child: Padding(
-                  padding:
-                      const EdgeInsets.symmetric(
-                    horizontal: 4,
-                    vertical: 8,
-                  ),
-                  child: Column(
-                    mainAxisAlignment:
-                        MainAxisAlignment.center,
-                    children: [
-                      // ICON FRAME
-                      Container(
-                        width: 46,
-                        height: 46,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: color.withValues(
-                            alpha: 0.09,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(
+              horizontal: 5,
+              vertical: 9,
+            ),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                // ═══════════════════════════════
+                // OUTER ICON CIRCLE
+                // ═══════════════════════════════
+                Container(
+                  width: 48,
+                  height: 48,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: dark
+                        ? LinearGradient(
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                            colors: [
+                              AppTheme.green,
+                              AppTheme.darkGreen,
+                            ],
+                          )
+                        : null,
+                    color: dark
+                        ? null
+                        : AppTheme.darkGreen.withValues(
+                            alpha: 0.10,
                           ),
-                          border: Border.all(
-                            color: color.withValues(
-                              alpha: 0.35,
-                            ),
-                            width: 1,
-                          ),
-                        ),
-                        child: Stack(
-                          alignment:
-                              Alignment.center,
-                          children: [
-                            Transform.rotate(
-                              angle: math.pi / 4,
-                              child: Container(
-                                width: 25,
-                                height: 25,
-                                decoration:
-                                    BoxDecoration(
-                                  border: Border.all(
-                                    color: color
-                                        .withValues(
-                                      alpha: 0.16,
-                                    ),
-                                  ),
-                                ),
+                    border: Border.all(
+                      color: AppTheme.gold.withValues(
+                        alpha: dark ? 0.70 : 0.40,
+                      ),
+                      width: 1.1,
+                    ),
+                    boxShadow: dark
+                        ? [
+                            BoxShadow(
+                              color: AppTheme.gold.withValues(
+                                alpha: 0.13,
                               ),
+                              blurRadius: 9,
+                              spreadRadius: 1,
                             ),
-                            Icon(
-                              icon,
-                              color: color,
-                              size: 23,
-                            ),
-                          ],
+                          ]
+                        : null,
+                  ),
+                  child: Center(
+                    // Inner icon box
+                    child: Container(
+                      width: 34,
+                      height: 34,
+                      decoration: BoxDecoration(
+                        color: dark
+                            ? AppTheme.cardLightDark
+                            : AppTheme.darkGreen,
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(
+                          color: AppTheme.gold.withValues(
+                            alpha: dark ? 0.60 : 0.45,
+                          ),
+                          width: 0.8,
                         ),
+                        boxShadow: dark
+                            ? [
+                                BoxShadow(
+                                  color: Colors.black.withValues(
+                                    alpha: 0.20,
+                                  ),
+                                  blurRadius: 5,
+                                  offset: const Offset(0, 2),
+                                ),
+                              ]
+                            : null,
                       ),
-
-                      const SizedBox(height: 7),
-
-                      Text(
-                        title,
-                        textAlign:
-                            TextAlign.center,
-                        maxLines: 2,
-                        overflow:
-                            TextOverflow.ellipsis,
-                        style: TextStyle(
-                          color:
-                              AppTheme.textPrimary,
-                          fontSize: 11.5,
-                          height: 1.15,
-                          fontWeight:
-                              FontWeight.w600,
-                        ),
+                      child: Icon(
+                        icon,
+                        size: 20,
+                        color: dark
+                            ? AppTheme.goldLight
+                            : AppTheme.gold,
                       ),
-                    ],
+                    ),
                   ),
                 ),
-              ),
-            ],
+
+                const SizedBox(height: 8),
+
+                // Label
+                Text(
+                  title,
+                  textAlign: TextAlign.center,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: AppTheme.textPrimary,
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w700,
+                    height: 1.25,
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -694,171 +561,89 @@ class _MenuCard extends StatelessWidget {
   }
 }
 
-// =================================================================
+
+// ═══════════════════════════════════════════════════════════════
 // ISLAMIC GEOMETRIC BACKGROUND
-// =================================================================
+// ═══════════════════════════════════════════════════════════════
 
-class IslamicHomePainter
-    extends CustomPainter {
-  final bool isDark;
+class IslamicBackgroundPainter extends CustomPainter {
+  final Color color;
 
-  IslamicHomePainter({
-    required this.isDark,
+  IslamicBackgroundPainter({
+    required this.color,
   });
 
   @override
-  void paint(
-    Canvas canvas,
-    Size size,
-  ) {
-    // ===========================================================
-    // BASE GLOW
-    // ===========================================================
-
-    final glowPaint = Paint()
-      ..shader = RadialGradient(
-        center: const Alignment(
-          -0.7,
-          -0.8,
-        ),
-        radius: 1.2,
-        colors: [
-          AppTheme.gold.withValues(
-            alpha: isDark ? 0.055 : 0.035,
-          ),
-          Colors.transparent,
-        ],
-      ).createShader(
-        Rect.fromLTWH(
-          0,
-          0,
-          size.width,
-          size.height,
-        ),
-      );
-
-    canvas.drawRect(
-      Offset.zero & size,
-      glowPaint,
-    );
-
-    // ===========================================================
-    // ISLAMIC STAR PATTERN
-    // ===========================================================
-
-    final starPaint = Paint()
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 0.75
-      ..color = AppTheme.gold.withValues(
-        alpha: isDark ? 0.075 : 0.085,
-      );
+      ..strokeWidth = 0.7;
 
-    const spacing = 78.0;
+    const double spacing = 82;
 
-    for (double x = -spacing;
-        x < size.width + spacing;
-        x += spacing) {
-      for (double y = -spacing;
-          y < size.height + spacing;
-          y += spacing) {
-        _drawStar(
+    for (
+      double x = -spacing;
+      x < size.width + spacing;
+      x += spacing
+    ) {
+      for (
+        double y = -spacing;
+        y < size.height + spacing;
+        y += spacing
+      ) {
+        _drawPattern(
           canvas,
           Offset(x, y),
-          30,
-          starPaint,
+          35,
+          paint,
         );
       }
     }
 
-    // ===========================================================
-    // DIAGONAL ARABESQUE LINES
-    // ===========================================================
-
-    final linePaint = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 0.5
-      ..color = AppTheme.gold.withValues(
-        alpha: isDark ? 0.035 : 0.045,
-      );
-
-    for (double i = -size.height;
-        i < size.width + size.height;
-        i += 110) {
-      canvas.drawLine(
-        Offset(i, 0),
-        Offset(
-          i + size.height,
-          size.height,
+    // Soft central glow
+    final glowPaint = Paint()
+      ..shader = RadialGradient(
+        colors: [
+          AppTheme.gold.withValues(alpha: 0.035),
+          Colors.transparent,
+        ],
+      ).createShader(
+        Rect.fromCircle(
+          center: Offset(
+            size.width / 2,
+            size.height / 2,
+          ),
+          radius: size.width * 0.65,
         ),
-        linePaint,
       );
 
-      canvas.drawLine(
-        Offset(i, size.height),
-        Offset(
-          i + size.height,
-          0,
-        ),
-        linePaint,
-      );
-    }
-
-    // ===========================================================
-    // TOP DECORATIVE BORDER
-    // ===========================================================
-
-    final borderPaint = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1
-      ..color = AppTheme.gold.withValues(
-        alpha: isDark ? 0.12 : 0.10,
-      );
-
-    const borderY = 4.0;
-
-    canvas.drawLine(
-      Offset(0, borderY),
-      Offset(size.width, borderY),
-      borderPaint,
+    canvas.drawCircle(
+      Offset(
+        size.width / 2,
+        size.height / 2,
+      ),
+      size.width * 0.65,
+      glowPaint,
     );
-
-    for (double x = 15;
-        x < size.width;
-        x += 28) {
-      canvas.drawCircle(
-        Offset(x, borderY),
-        1.5,
-        borderPaint,
-      );
-    }
   }
 
-  void _drawStar(
+  void _drawPattern(
     Canvas canvas,
     Offset center,
     double radius,
     Paint paint,
   ) {
-    const points = 8;
-
+    // Outer octagon
     final path = Path();
 
-    for (int i = 0;
-        i < points * 2;
-        i++) {
+    for (int i = 0; i <= 8; i++) {
       final angle =
-          -math.pi / 2 +
-          (math.pi / points) * i;
-
-      final r = i.isEven
-          ? radius
-          : radius * 0.46;
+          (math.pi * 2 / 8) * i + math.pi / 8;
 
       final point = Offset(
-        center.dx +
-            math.cos(angle) * r,
-        center.dy +
-            math.sin(angle) * r,
+        center.dx + math.cos(angle) * radius,
+        center.dy + math.sin(angle) * radius,
       );
 
       if (i == 0) {
@@ -874,58 +659,84 @@ class IslamicHomePainter
       }
     }
 
-    path.close();
-
     canvas.drawPath(
       path,
       paint,
     );
 
-    // Inner octagon
-    final innerPath = Path();
+    // Inner diamond
+    final inner = Path();
 
-    for (int i = 0; i < points; i++) {
+    for (int i = 0; i <= 4; i++) {
       final angle =
-          -math.pi / 2 +
-          (2 * math.pi / points) * i;
+          (math.pi * 2 / 4) * i + math.pi / 4;
 
       final point = Offset(
         center.dx +
             math.cos(angle) *
                 radius *
-                0.38,
+                0.58,
         center.dy +
             math.sin(angle) *
                 radius *
-                0.38,
+                0.58,
       );
 
       if (i == 0) {
-        innerPath.moveTo(
+        inner.moveTo(
           point.dx,
           point.dy,
         );
       } else {
-        innerPath.lineTo(
+        inner.lineTo(
           point.dx,
           point.dy,
         );
       }
     }
 
-    innerPath.close();
-
     canvas.drawPath(
-      innerPath,
+      inner,
       paint,
     );
+
+    // Connecting lines
+    for (int i = 0; i < 8; i++) {
+      final angle =
+          (math.pi * 2 / 8) * i + math.pi / 8;
+
+      final outerPoint = Offset(
+        center.dx +
+            math.cos(angle) *
+                radius,
+        center.dy +
+            math.sin(angle) *
+                radius,
+      );
+
+      final innerPoint = Offset(
+        center.dx +
+            math.cos(angle) *
+                radius *
+                0.58,
+        center.dy +
+            math.sin(angle) *
+                radius *
+                0.58,
+      );
+
+      canvas.drawLine(
+        outerPoint,
+        innerPoint,
+        paint,
+      );
+    }
   }
 
   @override
   bool shouldRepaint(
-    covariant IslamicHomePainter oldDelegate,
+    covariant IslamicBackgroundPainter oldDelegate,
   ) {
-    return oldDelegate.isDark !=
-        isDark;
+    return oldDelegate.color != color;
   }
 }
