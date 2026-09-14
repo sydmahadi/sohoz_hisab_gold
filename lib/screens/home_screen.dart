@@ -84,7 +84,6 @@ class HomeScreen extends StatelessWidget {
       appBar: AppBar(
         title: const Text('সহজ হিসাব গোল্ড'),
         actions: [
-          // ─── দৃশ্যমান থিম চেঞ্জ বাটন (ডান কর্নারে) ───
           ValueListenableBuilder<ThemeMode>(
             valueListenable: AppTheme.themeNotifier,
             builder: (_, ThemeMode mode, __) {
@@ -220,28 +219,39 @@ class _HeaderCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.fromLTRB(20, 25, 20, 24),
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
+        gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [
-            AppTheme.darkGreen,
-            AppTheme.backgroundSecondaryDark,
-          ],
+          colors: isDark
+              ? const [
+                  AppTheme.darkGreen,
+                  AppTheme.backgroundSecondaryDark,
+                ]
+              : const [
+                  AppTheme.darkGreen,
+                  AppTheme.green,
+                ],
         ),
         borderRadius: BorderRadius.circular(28),
         border: Border.all(
-          color: AppTheme.gold.withValues(alpha: 0.65),
+          color: isDark
+              ? AppTheme.gold.withValues(alpha: 0.65)
+              : AppTheme.gold.withValues(alpha: 0.8),
           width: 0.8,
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.35),
-            blurRadius: 22,
-            offset: const Offset(0, 10),
+            color: isDark
+                ? Colors.black.withValues(alpha: 0.35)
+                : AppTheme.darkGreen.withValues(alpha: 0.25),
+            blurRadius: 18,
+            offset: const Offset(0, 8),
           ),
         ],
       ),
@@ -252,9 +262,11 @@ class _HeaderCard extends StatelessWidget {
             height: 58,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              color: AppTheme.backgroundDark.withValues(alpha: 0.55),
+              color: isDark
+                  ? AppTheme.backgroundDark.withValues(alpha: 0.55)
+                  : Colors.white.withValues(alpha: 0.15),
               border: Border.all(
-                color: AppTheme.gold.withValues(alpha: 0.65),
+                color: AppTheme.gold.withValues(alpha: 0.75),
                 width: 1,
               ),
               boxShadow: [
@@ -309,7 +321,7 @@ class _HeaderCard extends StatelessWidget {
               gradient: LinearGradient(
                 colors: [
                   Colors.transparent,
-                  AppTheme.gold.withValues(alpha: 0.6),
+                  AppTheme.gold.withValues(alpha: 0.7),
                   Colors.transparent,
                 ],
               ),
@@ -320,7 +332,7 @@ class _HeaderCard extends StatelessWidget {
             'হিসাব, নোট, ক্যালেন্ডার ও প্রয়োজনীয় টুল এক জায়গায়',
             textAlign: TextAlign.center,
             style: TextStyle(
-              color: Colors.white.withValues(alpha: 0.72),
+              color: Colors.white.withValues(alpha: 0.8),
               fontSize: 12.5,
               height: 1.5,
             ),
@@ -363,25 +375,25 @@ class _MenuCard extends StatelessWidget {
                       AppTheme.cardLightDark,
                       AppTheme.cardColorDark,
                     ]
-                  : [
+                  : const [
                       Colors.white,
-                      const Color(0xFFF9F9F9),
+                      Color(0xFFF7F9F8),
                     ],
             ),
             borderRadius: BorderRadius.circular(21),
             border: Border.all(
               color: isDark
                   ? AppTheme.gold.withValues(alpha: 0.38)
-                  : AppTheme.darkGreen.withValues(alpha: 0.2),
-              width: 0.7,
+                  : const Color(0xFFD3DDD8),
+              width: isDark ? 0.7 : 1.0,
             ),
             boxShadow: [
               BoxShadow(
                 color: isDark
                     ? Colors.black.withValues(alpha: 0.22)
-                    : Colors.black.withValues(alpha: 0.05),
+                    : Colors.black.withValues(alpha: 0.04),
                 blurRadius: 10,
-                offset: const Offset(0, 5),
+                offset: const Offset(0, 4),
               ),
             ],
           ),
@@ -451,6 +463,7 @@ class _BottomInfo extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
 
     return Column(
       children: [
@@ -499,9 +512,11 @@ class _BottomInfo extends StatelessWidget {
         Text(
           'সহজ • সুন্দর • প্রয়োজনীয়',
           style: TextStyle(
-            color: AppTheme.gold.withValues(alpha: 0.7),
+            color: isDark
+                ? AppTheme.gold.withValues(alpha: 0.7)
+                : AppTheme.darkGreen,
             fontSize: 11,
-            fontWeight: FontWeight.w500,
+            fontWeight: FontWeight.w600,
           ),
         ),
       ],
@@ -533,14 +548,14 @@ class _IslamicPatternPainter extends CustomPainter {
     final goldPaint = Paint()
       ..color = isDark
           ? AppTheme.gold.withValues(alpha: 0.035)
-          : AppTheme.gold.withValues(alpha: 0.12)
+          : AppTheme.gold.withValues(alpha: 0.08)
       ..style = PaintingStyle.stroke
       ..strokeWidth = 0.9;
 
     final greenPaint = Paint()
       ..color = isDark
           ? AppTheme.green.withValues(alpha: 0.05)
-          : AppTheme.green.withValues(alpha: 0.15)
+          : AppTheme.green.withValues(alpha: 0.09)
       ..style = PaintingStyle.stroke
       ..strokeWidth = 0.9;
 
