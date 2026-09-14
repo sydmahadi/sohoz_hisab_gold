@@ -14,11 +14,19 @@ class ShohozHisabPlusApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      debugShowCheckedModeBanner: false,
-      title: 'সহজ হিসাব প্লাস',
-      theme: AppTheme.lightTheme,
-      home: const HomeScreen(),
+    // ValueListenableBuilder দিয়ে থিম রিয়্যাক্টিভ করা হয়েছে
+    return ValueListenableBuilder<ThemeMode>(
+      valueListenable: AppTheme.themeNotifier,
+      builder: (_, ThemeMode currentMode, __) {
+        return MaterialApp(
+          debugShowCheckedModeBanner: false,
+          title: 'সহজ হিসাব গোল্ড',
+          theme: AppTheme.lightTheme,
+          darkTheme: AppTheme.darkTheme,
+          themeMode: currentMode, // ডার্ক বা লাইট মোড সিলেক্ট করবে
+          home: const HomeScreen(),
+        );
+      },
     );
   }
 }
