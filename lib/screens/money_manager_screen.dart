@@ -12,7 +12,7 @@ class MoneyManagerScreen extends StatefulWidget {
 }
 
 class _MoneyManagerScreenState extends State<MoneyManagerScreen> {
-  int _currentIndex = 1; // Stats দেখার জন্য ১ সেট করা
+  int _currentIndex = 0; // Trans. ভিউ দেখার জন্য ০ সেট করা
   int _statsTab = 1; // 0 = Income, 1 = Expenses
   DateTime _selectedDate = DateTime.now();
   String _filterType = 'Monthly';
@@ -46,7 +46,7 @@ class _MoneyManagerScreenState extends State<MoneyManagerScreen> {
     'ফাউন্ডেশন',
   ];
 
-  // আপনার দেওয়া আপডেট করা Income (আয়) ক্যাটাগরি তালিকা
+  // Income (আয়) ক্যাটাগরি তালিকা
   List<String> _incomeCategories = [
     'জনশক্তি',
     'শুভাকাঙ্খী এয়ানত',
@@ -151,7 +151,7 @@ class _MoneyManagerScreenState extends State<MoneyManagerScreen> {
     );
   }
 
-  // --- 1. Transactions View ---
+  // --- 1. Date Wise Grouped Transactions View ---
   Widget _buildTransView() {
     double totalIncome = _transactions
         .where((e) => e.type == 'Income')
@@ -161,8 +161,20 @@ class _MoneyManagerScreenState extends State<MoneyManagerScreen> {
         .fold(0, (sum, item) => sum + item.amount);
     double balance = totalIncome - totalExpense;
 
+    // তারিখ অনুযায়ী লেনদেন গ্রুপিং করা
+    Map<String, List<MoneyTransaction>> groupedTrans = {};
+    for (var trans in _transactions) {
+      if (!groupedTrans.containsKey(trans.date)) {
+        groupedTrans[trans.date] = [];
+      }
+      groupedTrans[trans.date]!.add(trans);
+    }
+
+    final dates = groupedTrans.keys.toList();
+
     return Column(
       children: [
+        // টপ সামারি কার্ড
         Container(
           padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
           color: AppTheme.cardLight,
@@ -181,38 +193,101 @@ class _MoneyManagerScreenState extends State<MoneyManagerScreen> {
                   child: Text("কোনো লেনদেন পাওয়া যায়নি",
                       style: TextStyle(color: Colors.white54)))
               : ListView.builder(
-                  itemCount: _transactions.length,
+                  itemCount: dates.length,
                   itemBuilder: (context, index) {
-                    final item = _transactions[index];
-                    bool isIncome = item.type == 'Income';
-                    bool isTransfer = item.type == 'Transfer';
-                    return Container(
-                      margin: const EdgeInsets.symmetric(
-                          horizontal: 12, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: AppTheme.cardColor,
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: ListTile(
-                        title: Text(item.category,
-                            style: const TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.bold)),
-                        subtitle: Text('${item.account} • ${item.date}',
-                            style: const TextStyle(color: Colors.grey)),
-                        trailing: Text(
-                          '৳ ${item.amount.toStringAsFixed(2)}',
-                          style: TextStyle(
-                            color: isIncome
-                                ? Colors.blue
-                                : (isTransfer
-                                    ? Colors.orange
-                                    : Colors.redAccent),
-                            fontWeight: FontWeight.bold,
-                            fontSize: 16,
+                    String dateStr = dates[index];
+                    List<MoneyTransaction> dayTrans = groupedTrans[dateStr]!;
+
+                    double dayIncome = dayTrans
+                        .where((e) => e.type == 'Income')
+                        .fold(0, (sum, item) => sum + item.amount);
+                    double dayExpense = dayTrans
+                        .where((e) => e.type == 'Expense')
+                        .fold(0, (sum, item) => sum + item.amount);
+
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // তারিখ অনুযায়ী হেডার (Date Group Header)
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 16, vertical: 8),
+                          color: AppTheme.cardLight.withOpacity(0.5),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                dateStr,
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 14,
+                                ),
+                              ),
+                              Row(
+                                children: [
+                                  if (dayIncome > 0)
+                                    Text(
+                                      '৳ ${dayIncome.toStringAsFixed(2)}  ',
+                                      style: const TextStyle(
+                                          color: Colors.blue,
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.bold),
+                                    ),
+                                  if (dayExpense > 0)
+                                    Text(
+                                      '৳ ${dayExpense.toStringAsFixed(2)}',
+                                      style: const TextStyle(
+                                          color: Colors.redAccent,
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.bold),
+                                    ),
+                                ],
+                              )
+                            ],
                           ),
                         ),
-                      ),
+                        // ওই নির্দিষ্ট তারিখের সব লেনদেন
+                        ...dayTrans.map((item) {
+                          bool isIncome = item.type == 'Income';
+                          bool isTransfer = item.type == 'Transfer';
+                          return Container(
+                            decoration: const BoxDecoration(
+                              border: Border(
+                                bottom: BorderSide(
+                                    color: Colors.white12, width: 0.5),
+                              ),
+                            ),
+                            child: ListTile(
+                              dense: true,
+                              title: Text(item.category,
+                                  style: const TextStyle(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.w600,
+                                      fontSize: 15)),
+                              subtitle: Text(
+                                item.note.isNotEmpty
+                                    ? '${item.account} • ${item.note}'
+                                    : item.account,
+                                style: const TextStyle(
+                                    color: Colors.grey, fontSize: 12),
+                              ),
+                              trailing: Text(
+                                '৳ ${item.amount.toStringAsFixed(2)}',
+                                style: TextStyle(
+                                  color: isIncome
+                                      ? Colors.blue
+                                      : (isTransfer
+                                          ? Colors.orange
+                                          : Colors.redAccent),
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 15,
+                                ),
+                              ),
+                            ),
+                          );
+                        }).toList(),
+                      ],
                     );
                   },
                 ),
@@ -270,7 +345,6 @@ class _MoneyManagerScreenState extends State<MoneyManagerScreen> {
 
     return Column(
       children: [
-        // তারিখ ও ফিল্টার হেডার
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
           child: Row(
@@ -337,8 +411,6 @@ class _MoneyManagerScreenState extends State<MoneyManagerScreen> {
             ],
           ),
         ),
-
-        // Income & Expense Tabs
         Row(
           children: [
             Expanded(
@@ -389,10 +461,7 @@ class _MoneyManagerScreenState extends State<MoneyManagerScreen> {
             ),
           ],
         ),
-
         const Divider(color: Colors.white12, height: 1),
-
-        // Pie Chart Section
         Expanded(
           child: sortedEntries.isEmpty
               ? const Center(
@@ -432,8 +501,6 @@ class _MoneyManagerScreenState extends State<MoneyManagerScreen> {
                       ),
                     ),
                     const SizedBox(height: 15),
-
-                    // Category List
                     Expanded(
                       child: Container(
                         color: AppTheme.cardColor,
