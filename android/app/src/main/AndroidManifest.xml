@@ -3,7 +3,7 @@
     <uses-permission android:name="android.permission.INTERNET"/>
 
     <application
-        android:label="সহজ হিসাব প্লাস"
+        android:label="সহজ হিসাব গোল্ড"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
 
