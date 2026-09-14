@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package me:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:intl/intl.dart';
 import '../theme/app_theme.dart';
@@ -72,6 +72,8 @@ class _MoneyManagerScreenState extends State<MoneyManagerScreen> {
   void initState() {
     super.initState();
     _loadData();
+    // অ্যাপ চালু হওয়ামাত্র গুগল অ্যাকাউন্ট চেক ও সাইন-ইন করবে
+    MoneyDbHelper.signInWithGoogle();
   }
 
   Future<void> _loadData() async {
@@ -81,7 +83,6 @@ class _MoneyManagerScreenState extends State<MoneyManagerScreen> {
     });
   }
 
-  // তারিখ রূপান্তরের হেলপার
   DateTime? _parseDate(String dateStr) {
     try {
       return DateFormat('dd/MM/yyyy').parse(dateStr);
@@ -90,7 +91,6 @@ class _MoneyManagerScreenState extends State<MoneyManagerScreen> {
     }
   }
 
-  // নির্দিষ্ট অ্যাকাউন্ট অনুযায়ী প্লাস-মাইনাস করে ব্যালেন্স হিসাব করার ফাংশন
   double _calculateAccountBalance(String accountName) {
     double balance = 0.0;
     for (var item in _transactions) {
@@ -109,7 +109,6 @@ class _MoneyManagerScreenState extends State<MoneyManagerScreen> {
     return balance;
   }
 
-  // Stats ফিল্টারিং
   List<MoneyTransaction> _getFilteredTransactions() {
     return _transactions.where((item) {
       DateTime? itemDate = _parseDate(item.date);
@@ -164,8 +163,8 @@ class _MoneyManagerScreenState extends State<MoneyManagerScreen> {
                   SnackBar(
                     content: Text(
                       success
-                          ? "গুগল ড্রাইভ সিঙ্ক চালু হয়েছে!"
-                          : "সিঙ্ক ব্যর্থ হয়েছে",
+                          ? "গুগল ড্রাইভ কানেক্ট সম্পন্ন হয়েছে!"
+                          : "সাইন-ইন করতে সমস্যা হয়েছে",
                     ),
                   ),
                 );
@@ -204,7 +203,7 @@ class _MoneyManagerScreenState extends State<MoneyManagerScreen> {
     );
   }
 
-  // --- 1. Transactions View (Grouped by Date) ---
+  // --- 1. Transactions View ---
   Widget _buildTransView() {
     double totalIncome = _transactions
         .where((e) => e.type == 'Income')
@@ -357,7 +356,7 @@ class _MoneyManagerScreenState extends State<MoneyManagerScreen> {
     );
   }
 
-  // --- 2. Dynamic Stats View ---
+  // --- 2. Stats View ---
   Widget _buildStatsView() {
     List<MoneyTransaction> filteredTrans = _getFilteredTransactions();
 
@@ -629,7 +628,7 @@ class _MoneyManagerScreenState extends State<MoneyManagerScreen> {
     );
   }
 
-  // --- 3. Live Balance Dynamic Accounts View ---
+  // --- 3. Accounts View ---
   Widget _buildAccountsView() {
     return ListView.builder(
       itemCount: _accounts.length,
@@ -710,10 +709,14 @@ class _MoneyManagerScreenState extends State<MoneyManagerScreen> {
         label: const Text('Google Drive-এ ব্যাকআপ নিন',
             style: TextStyle(color: Colors.black)),
         onPressed: () async {
-          await MoneyDbHelper.autoBackupToDrive();
+          bool ok = await MoneyDbHelper.autoBackupToDrive();
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text("গুগল ড্রাইভে ব্যাকআপ সফল হয়েছে!")),
+              SnackBar(
+                content: Text(ok
+                    ? "গুগল ড্রাইভে ব্যাকআপ সফল হয়েছে!"
+                    : "ব্যাকআপ নেওয়া সম্ভব হয়নি"),
+              ),
             );
           }
         },
