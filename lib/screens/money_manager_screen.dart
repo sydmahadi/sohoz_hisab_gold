@@ -12,8 +12,49 @@ class MoneyManagerScreen extends StatefulWidget {
 }
 
 class _MoneyManagerScreenState extends State<MoneyManagerScreen> {
-  int _currentIndex = 0;
+  int _currentIndex = 1; // Stats দেখার জন্য ১ সেট করা
+  int _statsTab = 1; // 0 = Income, 1 = Expenses
+  DateTime _selectedDate = DateTime.now();
+  String _filterType = 'Monthly';
+
   List<MoneyTransaction> _transactions = [];
+
+  // আপনার দেওয়া আপডেট করা Expense ক্যাটাগরি তালিকা
+  List<String> _expenseCategories = [
+    'উর্ধ্বতন এয়ানত',
+    'যাতায়াত',
+    'অফিস স্টেশনারী',
+    'আপ্যায়ন',
+    'প্রচার',
+    'অফিস ভাড়া',
+    'সফর',
+    'ডাক ও তার',
+    'ছাত্রকল্যাণ',
+    'পাঠাগার',
+    'প্রোগ্রাম বান্তবায়ন',
+    'প্রকাশনা',
+    'সাহিত্য',
+    'দাওয়াতী কার্যক্রম',
+    'প্রশিক্ষণ',
+    'চিকিৎসা',
+    'যানবাহন মেরামত',
+    'সৌজন্য',
+    'ঋণ পরিশোধ',
+    'সদস্য সম্মেলন',
+    'আসবাবপত্র/ সম্পদ',
+    'শহীদ পরিবার',
+    'ফাউন্ডেশন',
+  ];
+
+  // Income ক্যাটাগরি (পরবর্তীতে আপনার তালিকা অনুযায়ী আপডেট করা হবে)
+  List<String> _incomeCategories = [
+    'এয়ানত',
+    'দান',
+    'বাজেট',
+    'অন্যান্য',
+  ];
+
+  List<String> _accounts = ['Cash', 'Bkash', 'Bank Account', 'Nagad', 'Card'];
 
   @override
   void initState() {
@@ -33,7 +74,7 @@ class _MoneyManagerScreenState extends State<MoneyManagerScreen> {
     final pages = [
       _buildTransView(),
       _buildStatsView(),
-      const Center(child: Text("অ্যাকাউন্টস স্ক্রিন", style: TextStyle(color: Colors.white))),
+      _buildAccountsView(),
       _buildMoreView(),
     ];
 
@@ -49,7 +90,11 @@ class _MoneyManagerScreenState extends State<MoneyManagerScreen> {
               if (mounted) {
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
-                    content: Text(success ? "গুগল ড্রাইভ সিঙ্ক চালু হয়েছে!" : "সিঙ্ক ব্যর্থ হয়েছে"),
+                    content: Text(
+                      success
+                          ? "গুগল ড্রাইভ সিঙ্ক চালু হয়েছে!"
+                          : "সিঙ্ক ব্যর্থ হয়েছে",
+                    ),
                   ),
                 );
               }
@@ -73,18 +118,28 @@ class _MoneyManagerScreenState extends State<MoneyManagerScreen> {
         backgroundColor: AppTheme.cardColor,
         type: BottomNavigationBarType.fixed,
         items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.book), label: 'Trans.'),
-          BottomNavigationBarItem(icon: Icon(Icons.bar_chart), label: 'Stats'),
-          BottomNavigationBarItem(icon: Icon(Icons.account_balance), label: 'Accounts'),
-          BottomNavigationBarItem(icon: Icon(Icons.more_horiz), label: 'More'),
+          BottomNavigationBarItem(
+              icon: Icon(Icons.book_outlined), label: 'Trans.'),
+          BottomNavigationBarItem(
+              icon: Icon(Icons.bar_chart_rounded), label: 'Stats'),
+          BottomNavigationBarItem(
+              icon: Icon(Icons.account_balance_wallet_outlined),
+              label: 'Accounts'),
+          BottomNavigationBarItem(
+              icon: Icon(Icons.more_horiz_rounded), label: 'More'),
         ],
       ),
     );
   }
 
+  // --- 1. Transactions View ---
   Widget _buildTransView() {
-    double totalIncome = _transactions.where((e) => e.type == 'Income').fold(0, (sum, item) => sum + item.amount);
-    double totalExpense = _transactions.where((e) => e.type == 'Expense').fold(0, (sum, item) => sum + item.amount);
+    double totalIncome = _transactions
+        .where((e) => e.type == 'Income')
+        .fold(0, (sum, item) => sum + item.amount);
+    double totalExpense = _transactions
+        .where((e) => e.type == 'Expense')
+        .fold(0, (sum, item) => sum + item.amount);
     double balance = totalIncome - totalExpense;
 
     return Column(
@@ -103,25 +158,37 @@ class _MoneyManagerScreenState extends State<MoneyManagerScreen> {
         ),
         Expanded(
           child: _transactions.isEmpty
-              ? const Center(child: Text("কোনো লেনদেন পাওয়া যায়নি", style: TextStyle(color: Colors.white54)))
+              ? const Center(
+                  child: Text("কোনো লেনদেন পাওয়া যায়নি",
+                      style: TextStyle(color: Colors.white54)))
               : ListView.builder(
                   itemCount: _transactions.length,
                   itemBuilder: (context, index) {
                     final item = _transactions[index];
                     bool isIncome = item.type == 'Income';
+                    bool isTransfer = item.type == 'Transfer';
                     return Container(
-                      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                      margin: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 4),
                       decoration: BoxDecoration(
                         color: AppTheme.cardColor,
                         borderRadius: BorderRadius.circular(10),
                       ),
                       child: ListTile(
-                        title: Text(item.category, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                        subtitle: Text('${item.account} • ${item.date}', style: const TextStyle(color: Colors.grey)),
+                        title: Text(item.category,
+                            style: const TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold)),
+                        subtitle: Text('${item.account} • ${item.date}',
+                            style: const TextStyle(color: Colors.grey)),
                         trailing: Text(
                           '৳ ${item.amount.toStringAsFixed(2)}',
                           style: TextStyle(
-                            color: isIncome ? Colors.blue : Colors.redAccent,
+                            color: isIncome
+                                ? Colors.blue
+                                : (isTransfer
+                                    ? Colors.orange
+                                    : Colors.redAccent),
                             fontWeight: FontWeight.bold,
                             fontSize: 16,
                           ),
@@ -140,68 +207,352 @@ class _MoneyManagerScreenState extends State<MoneyManagerScreen> {
       children: [
         Text(label, style: const TextStyle(color: Colors.grey, fontSize: 13)),
         const SizedBox(height: 4),
-        Text('৳ ${amount.toStringAsFixed(2)}', style: TextStyle(color: color, fontWeight: FontWeight.bold, fontSize: 15)),
+        Text('৳ ${amount.toStringAsFixed(2)}',
+            style: TextStyle(
+                color: color, fontWeight: FontWeight.bold, fontSize: 15)),
       ],
     );
   }
 
+  // --- 2. Stats View ---
   Widget _buildStatsView() {
-    final expenses = _transactions.where((e) => e.type == 'Expense').toList();
-    double totalExpense = expenses.fold(0, (sum, item) => sum + item.amount);
+    double totalIncome = _transactions
+        .where((e) => e.type == 'Income')
+        .fold(0, (sum, item) => sum + item.amount);
+    double totalExpense = _transactions
+        .where((e) => e.type == 'Expense')
+        .fold(0, (sum, item) => sum + item.amount);
 
-    if (expenses.isEmpty) {
-      return const Center(child: Text("স্ট্যাটস দেখানোর মতো কোনো খরচ নেই", style: TextStyle(color: Colors.white54)));
-    }
+    final currentList = _transactions
+        .where((e) => e.type == (_statsTab == 0 ? 'Income' : 'Expense'))
+        .toList();
+
+    double currentTotal =
+        currentList.fold(0, (sum, item) => sum + item.amount);
 
     Map<String, double> categoryMap = {};
-    for (var e in expenses) {
+    for (var e in currentList) {
       categoryMap[e.category] = (categoryMap[e.category] ?? 0) + e.amount;
     }
 
-    List<PieChartSectionData> sections = [];
-    List<Color> colors = [Colors.redAccent, Colors.orange, Colors.amber, Colors.green, Colors.purple, Colors.blue];
-    int colorIdx = 0;
+    var sortedEntries = categoryMap.entries.toList()
+      ..sort((a, b) => b.value.compareTo(a.value));
 
-    categoryMap.forEach((category, amount) {
-      final percentage = (amount / totalExpense) * 100;
-      sections.add(PieChartSectionData(
-        color: colors[colorIdx % colors.length],
-        value: amount,
-        title: '${percentage.toStringAsFixed(1)}%',
-        radius: 60,
-        titleStyle: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12),
-      ));
-      colorIdx++;
-    });
+    List<Color> pieColors = [
+      const Color(0xFFFF6B6B),
+      const Color(0xFFFF9F43),
+      const Color(0xFFFFD93D),
+      const Color(0xFF6BCB77),
+      const Color(0xFF4D96FF),
+      const Color(0xFF9B59B6),
+      const Color(0xFF1ABC9C),
+      const Color(0xFFE67E22),
+    ];
 
     return Column(
       children: [
-        const SizedBox(height: 20),
-        SizedBox(
-          height: 200,
-          child: PieChart(PieChartData(sections: sections, centerSpaceRadius: 40)),
-        ),
-        const SizedBox(height: 20),
-        Expanded(
-          child: ListView(
-            children: categoryMap.entries.map((e) {
-              return ListTile(
-                title: Text(e.key, style: const TextStyle(color: Colors.white)),
-                trailing: Text('৳ ${e.value.toStringAsFixed(2)}', style: const TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold)),
-              );
-            }).toList(),
+        // তারিখ ও ফিল্টার হেডার
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.chevron_left, color: Colors.white),
+                    onPressed: () {
+                      setState(() {
+                        _selectedDate = DateTime(_selectedDate.year,
+                            _selectedDate.month - 1, _selectedDate.day);
+                      });
+                    },
+                  ),
+                  Text(
+                    DateFormat('MMM yyyy').format(_selectedDate),
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.chevron_right, color: Colors.white),
+                    onPressed: () {
+                      setState(() {
+                        _selectedDate = DateTime(_selectedDate.year,
+                            _selectedDate.month + 1, _selectedDate.day);
+                      });
+                    },
+                  ),
+                ],
+              ),
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                decoration: BoxDecoration(
+                  color: AppTheme.cardLight,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.white24),
+                ),
+                child: DropdownButtonHideUnderline(
+                  child: DropdownButton<String>(
+                    value: _filterType,
+                    dropdownColor: AppTheme.cardColor,
+                    style: const TextStyle(color: Colors.white, fontSize: 13),
+                    icon: const Icon(Icons.keyboard_arrow_down,
+                        color: Colors.white),
+                    items: ['Daily', 'Weekly', 'Monthly', 'Yearly']
+                        .map((String value) {
+                      return DropdownMenuItem<String>(
+                        value: value,
+                        child: Text(value),
+                      );
+                    }).toList(),
+                    onChanged: (val) {
+                      if (val != null) setState(() => _filterType = val);
+                    },
+                  ),
+                ),
+              ),
+            ],
           ),
         ),
+
+        // Income & Expense Tabs
+        Row(
+          children: [
+            Expanded(
+              child: GestureDetector(
+                onTap: () => setState(() => _statsTab = 0),
+                child: Column(
+                  children: [
+                    Text(
+                      'Income  ৳ ${totalIncome.toStringAsFixed(2)}',
+                      style: TextStyle(
+                        color: _statsTab == 0 ? Colors.white : Colors.grey,
+                        fontSize: 15,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Container(
+                      height: 3,
+                      color:
+                          _statsTab == 0 ? Colors.redAccent : Colors.transparent,
+                    )
+                  ],
+                ),
+              ),
+            ),
+            Expanded(
+              child: GestureDetector(
+                onTap: () => setState(() => _statsTab = 1),
+                child: Column(
+                  children: [
+                    Text(
+                      'Expenses  ৳ ${totalExpense.toStringAsFixed(2)}',
+                      style: TextStyle(
+                        color: _statsTab == 1 ? Colors.white : Colors.grey,
+                        fontSize: 15,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Container(
+                      height: 3,
+                      color:
+                          _statsTab == 1 ? Colors.redAccent : Colors.transparent,
+                    )
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+
+        const Divider(color: Colors.white12, height: 1),
+
+        // Pie Chart Section
+        Expanded(
+          child: sortedEntries.isEmpty
+              ? const Center(
+                  child: Text("কোনো তথ্য রেকর্ড করা নেই",
+                      style: TextStyle(color: Colors.white54)),
+                )
+              : Column(
+                  children: [
+                    const SizedBox(height: 20),
+                    SizedBox(
+                      height: 220,
+                      child: PieChart(
+                        PieChartData(
+                          sectionsSpace: 2,
+                          centerSpaceRadius: 0,
+                          sections: sortedEntries.asMap().entries.map((entry) {
+                            int idx = entry.key;
+                            var item = entry.value;
+                            final percentage =
+                                (item.value / currentTotal) * 100;
+                            final color = pieColors[idx % pieColors.length];
+
+                            return PieChartSectionData(
+                              color: color,
+                              value: item.value,
+                              title:
+                                  '${item.key}\n${percentage.toStringAsFixed(1)}%',
+                              radius: 100,
+                              titleStyle: const TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 11,
+                              ),
+                            );
+                          }).toList(),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 15),
+
+                    // Category List
+                    Expanded(
+                      child: Container(
+                        color: AppTheme.cardColor,
+                        child: ListView.separated(
+                          itemCount: sortedEntries.length,
+                          separatorBuilder: (c, i) =>
+                              const Divider(color: Colors.white12, height: 1),
+                          itemBuilder: (context, index) {
+                            var item = sortedEntries[index];
+                            final percentage = (item.value / currentTotal) * 100;
+                            final color = pieColors[index % pieColors.length];
+
+                            return Padding(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 16, vertical: 12),
+                              child: Row(
+                                children: [
+                                  Container(
+                                    width: 45,
+                                    height: 26,
+                                    alignment: Alignment.center,
+                                    decoration: BoxDecoration(
+                                      color: color,
+                                      borderRadius: BorderRadius.circular(6),
+                                    ),
+                                    child: Text(
+                                      '${percentage.toStringAsFixed(0)}%',
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 12,
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 14),
+                                  Expanded(
+                                    child: Text(
+                                      item.key,
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 15,
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
+                                  ),
+                                  Text(
+                                    '৳ ${item.value.toStringAsFixed(2)}',
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 15,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+        )
       ],
     );
   }
 
+  // --- 3. Accounts View ---
+  Widget _buildAccountsView() {
+    return ListView.builder(
+      itemCount: _accounts.length,
+      itemBuilder: (context, index) {
+        final acc = _accounts[index];
+        return Container(
+          margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+          decoration: BoxDecoration(
+            color: AppTheme.cardColor,
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: ListTile(
+            leading:
+                const Icon(Icons.account_balance_wallet, color: AppTheme.gold),
+            title: Text(acc,
+                style: const TextStyle(
+                    color: Colors.white, fontWeight: FontWeight.bold)),
+            trailing: IconButton(
+              icon: const Icon(Icons.edit, color: Colors.grey),
+              onPressed: () => _showEditAccountDialog(index),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  void _showEditAccountDialog(int index) {
+    TextEditingController controller =
+        TextEditingController(text: _accounts[index]);
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppTheme.cardColor,
+        title: const Text("অ্যাকাউন্টের নাম পরিবর্তন",
+            style: TextStyle(color: Colors.white)),
+        content: TextField(
+          controller: controller,
+          style: const TextStyle(color: Colors.white),
+          decoration: const InputDecoration(border: OutlineInputBorder()),
+        ),
+        actions: [
+          TextButton(
+            child: const Text("Cancel"),
+            onPressed: () => Navigator.pop(ctx),
+          ),
+          ElevatedButton(
+            child: const Text("Save"),
+            onPressed: () {
+              if (controller.text.trim().isNotEmpty) {
+                setState(() {
+                  _accounts[index] = controller.text.trim();
+                });
+              }
+              Navigator.pop(ctx);
+            },
+          )
+        ],
+      ),
+    );
+  }
+
+  // --- 4. More View ---
   Widget _buildMoreView() {
     return Center(
       child: ElevatedButton.icon(
         style: ElevatedButton.styleFrom(backgroundColor: AppTheme.gold),
         icon: const Icon(Icons.backup, color: Colors.black),
-        label: const Text('Google Drive-এ ম্যানুয়াল ব্যাকআপ নিন', style: TextStyle(color: Colors.black)),
+        label: const Text('Google Drive-এ ব্যাকআপ নিন',
+            style: TextStyle(color: Colors.black)),
         onPressed: () async {
           await MoneyDbHelper.autoBackupToDrive();
           if (mounted) {
@@ -214,14 +565,12 @@ class _MoneyManagerScreenState extends State<MoneyManagerScreen> {
     );
   }
 
+  // --- Add Transaction Modal ---
   void _showAddTransactionModal(BuildContext context) {
     String type = 'Expense';
-    String selectedCategory = 'Food';
+    String selectedCategory = _expenseCategories.first;
     double amount = 0;
     String note = '';
-
-    List<String> expenseCategories = ['Food', 'Transport', 'Social Life', 'Pets', 'Household', 'Apparel', 'Beauty', 'Health', 'Education', 'Gift', 'Other'];
-    List<String> incomeCategories = ['Allowance', 'Salary', 'Petty cash', 'Bonus', 'Baitul Mal', 'Other'];
 
     showModalBottomSheet(
       context: context,
@@ -230,7 +579,14 @@ class _MoneyManagerScreenState extends State<MoneyManagerScreen> {
       builder: (ctx) {
         return StatefulBuilder(
           builder: (context, setModalState) {
-            List<String> currentCategories = type == 'Expense' ? expenseCategories : incomeCategories;
+            List<String> currentCategories = [];
+            if (type == 'Expense') {
+              currentCategories = _expenseCategories;
+            } else if (type == 'Income') {
+              currentCategories = _incomeCategories;
+            } else {
+              currentCategories = _accounts;
+            }
 
             return Padding(
               padding: EdgeInsets.only(
@@ -256,7 +612,13 @@ class _MoneyManagerScreenState extends State<MoneyManagerScreen> {
                             onSelected: (val) {
                               setModalState(() {
                                 type = t;
-                                selectedCategory = currentCategories.first;
+                                if (type == 'Expense') {
+                                  selectedCategory = _expenseCategories.first;
+                                } else if (type == 'Income') {
+                                  selectedCategory = _incomeCategories.first;
+                                } else {
+                                  selectedCategory = _accounts.first;
+                                }
                               });
                             },
                           ),
@@ -275,17 +637,39 @@ class _MoneyManagerScreenState extends State<MoneyManagerScreen> {
                       onChanged: (val) => amount = double.tryParse(val) ?? 0,
                     ),
                     const SizedBox(height: 15),
-                    const Align(
-                      alignment: Alignment.centerLeft,
-                      child: Text("ক্যাটাগরি নির্ধারণ করুন:", style: TextStyle(color: Colors.white)),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          type == 'Transfer'
+                              ? "অ্যাকাউন্ট বাছাই করুন:"
+                              : "ক্যাটাগরি নির্ধারণ করুন:",
+                          style: const TextStyle(
+                              color: Colors.white, fontWeight: FontWeight.bold),
+                        ),
+                        if (type != 'Transfer')
+                          TextButton.icon(
+                            icon: const Icon(Icons.add,
+                                size: 16, color: AppTheme.gold),
+                            label: const Text("Add New",
+                                style: TextStyle(
+                                    color: AppTheme.gold, fontSize: 12)),
+                            onPressed: () {
+                              _showAddCategoryDialog(type, () {
+                                setModalState(() {});
+                              });
+                            },
+                          )
+                      ],
                     ),
-                    const SizedBox(height: 10),
+                    const SizedBox(height: 8),
                     GridView.builder(
                       shrinkWrap: true,
                       physics: const NeverScrollableScrollPhysics(),
-                      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                      gridDelegate:
+                          const SliverGridDelegateWithFixedCrossAxisCount(
                         crossAxisCount: 3,
-                        childAspectRatio: 2.5,
+                        childAspectRatio: 2.3,
                         crossAxisSpacing: 8,
                         mainAxisSpacing: 8,
                       ),
@@ -297,11 +681,19 @@ class _MoneyManagerScreenState extends State<MoneyManagerScreen> {
                           onTap: () => setModalState(() => selectedCategory = cat),
                           child: Container(
                             alignment: Alignment.center,
+                            padding: const EdgeInsets.symmetric(horizontal: 4),
                             decoration: BoxDecoration(
-                              color: isSelected ? Colors.redAccent : AppTheme.cardLight,
+                              color: isSelected
+                                  ? Colors.redAccent
+                                  : AppTheme.cardLight,
                               borderRadius: BorderRadius.circular(8),
                             ),
-                            child: Text(cat, style: const TextStyle(color: Colors.white, fontSize: 12)),
+                            child: Text(
+                              cat,
+                              style: const TextStyle(
+                                  color: Colors.white, fontSize: 11.5),
+                              textAlign: TextAlign.center,
+                            ),
                           ),
                         );
                       },
@@ -310,7 +702,7 @@ class _MoneyManagerScreenState extends State<MoneyManagerScreen> {
                     TextField(
                       style: const TextStyle(color: Colors.white),
                       decoration: const InputDecoration(
-                        labelText: 'নোট (অচ্ছিক)',
+                        labelText: 'নোট (ঐচ্ছিক)',
                         labelStyle: TextStyle(color: Colors.grey),
                         border: OutlineInputBorder(),
                       ),
@@ -322,7 +714,8 @@ class _MoneyManagerScreenState extends State<MoneyManagerScreen> {
                         backgroundColor: Colors.redAccent,
                         minimumSize: const Size(double.infinity, 45),
                       ),
-                      child: const Text('Save Transaction', style: TextStyle(color: Colors.white)),
+                      child: const Text('Save Transaction',
+                          style: TextStyle(color: Colors.white)),
                       onPressed: () async {
                         if (amount <= 0) return;
 
@@ -331,7 +724,9 @@ class _MoneyManagerScreenState extends State<MoneyManagerScreen> {
                           amount: amount,
                           date: DateFormat('dd/MM/yyyy').format(DateTime.now()),
                           category: selectedCategory,
-                          account: 'Cash',
+                          account: type == 'Transfer'
+                              ? 'Transfer ($selectedCategory)'
+                              : 'Cash',
                           note: note,
                         );
 
@@ -348,6 +743,49 @@ class _MoneyManagerScreenState extends State<MoneyManagerScreen> {
           },
         );
       },
+    );
+  }
+
+  void _showAddCategoryDialog(String type, VoidCallback onAdded) {
+    TextEditingController newCatController = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppTheme.cardColor,
+        title: const Text("নতুন ক্যাটাগরি যোগ করুন",
+            style: TextStyle(color: Colors.white)),
+        content: TextField(
+          controller: newCatController,
+          style: const TextStyle(color: Colors.white),
+          decoration: const InputDecoration(
+            hintText: "ক্যাটাগরির নাম",
+            hintStyle: TextStyle(color: Colors.grey),
+            border: OutlineInputBorder(),
+          ),
+        ),
+        actions: [
+          TextButton(
+            child: const Text("Cancel"),
+            onPressed: () => Navigator.pop(ctx),
+          ),
+          ElevatedButton(
+            child: const Text("Add"),
+            onPressed: () {
+              if (newCatController.text.trim().isNotEmpty) {
+                setState(() {
+                  if (type == 'Expense') {
+                    _expenseCategories.add(newCatController.text.trim());
+                  } else if (type == 'Income') {
+                    _incomeCategories.add(newCatController.text.trim());
+                  }
+                });
+                onAdded();
+              }
+              Navigator.pop(ctx);
+            },
+          )
+        ],
+      ),
     );
   }
 }
