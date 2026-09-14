@@ -38,21 +38,17 @@ class MoneyTransaction {
     return MoneyTransaction(
       id: map['id'] as int?,
       type: map['type']?.toString() ?? '',
-      amount:
-          (map['amount'] as num?)?.toDouble() ?? 0.0,
+      amount: (map['amount'] as num?)?.toDouble() ?? 0.0,
       date: map['date']?.toString() ?? '',
-      category:
-          map['category']?.toString() ?? '',
-      account:
-          map['account']?.toString() ?? '',
+      category: map['category']?.toString() ?? '',
+      account: map['account']?.toString() ?? '',
       note: map['note']?.toString(),
     );
   }
 }
 
 class MoneyDbHelper {
-  static final MoneyDbHelper instance =
-      MoneyDbHelper._init();
+  static final MoneyDbHelper instance = MoneyDbHelper._init();
 
   static Database? _database;
 
@@ -67,27 +63,26 @@ class MoneyDbHelper {
       return _database!;
     }
 
-    _database =
-        await _initDB('sohoz_money_manager.db');
+    _database = await _initDB('sohoz_money_manager.db');
 
     return _database!;
   }
 
-  Future<Database> _initDB(
-    String fileName,
-  ) async {
-    final dbPath =
-        await getDatabasesPath();
+  Future<Database> _initDB(String fileName) async {
+    final dbPath = await getDatabasesPath();
 
-    final dbFilePath =
-        join(dbPath, fileName);
+    final dbFilePath = join(dbPath, fileName);
 
-    return openDatabase(
+    return await openDatabase(
       dbFilePath,
       version: 1,
       onCreate: _createDB,
     );
   }
+
+  // ============================================================
+  // CREATE DATABASE
+  // ============================================================
 
   Future<void> _createDB(
     Database db,
@@ -115,9 +110,15 @@ class MoneyDbHelper {
   ) async {
     final db = await instance.database;
 
+    final data = transaction.toMap();
+
+    // ID database নিজে তৈরি করবে
+    data.remove('id');
+
     return await db.insert(
       'transactions',
-      transaction.toMap(),
+      data,
+      conflictAlgorithm: ConflictAlgorithm.replace,
     );
   }
 
@@ -125,10 +126,8 @@ class MoneyDbHelper {
   // GET ALL TRANSACTIONS
   // ============================================================
 
-  Future<List<MoneyTransaction>>
-      getAllTransactions() async {
-    final db =
-        await instance.database;
+  Future<List<MoneyTransaction>> getAllTransactions() async {
+    final db = await instance.database;
 
     final result = await db.query(
       'transactions',
@@ -137,8 +136,7 @@ class MoneyDbHelper {
 
     return result
         .map(
-          (json) =>
-              MoneyTransaction.fromMap(json),
+          (json) => MoneyTransaction.fromMap(json),
         )
         .toList();
   }
@@ -147,12 +145,10 @@ class MoneyDbHelper {
   // GET TRANSACTIONS BY TYPE
   // ============================================================
 
-  Future<List<MoneyTransaction>>
-      getTransactionsByType(
+  Future<List<MoneyTransaction>> getTransactionsByType(
     String type,
   ) async {
-    final db =
-        await instance.database;
+    final db = await instance.database;
 
     final result = await db.query(
       'transactions',
@@ -163,27 +159,78 @@ class MoneyDbHelper {
 
     return result
         .map(
-          (json) =>
-              MoneyTransaction.fromMap(json),
+          (json) => MoneyTransaction.fromMap(json),
         )
         .toList();
   }
 
   // ============================================================
-  // DELETE TRANSACTION
+  // GET TRANSACTIONS BY DATE
   // ============================================================
 
-  Future<int> deleteTransaction(
-    int id,
+  Future<List<MoneyTransaction>> getTransactionsByDate(
+    String date,
   ) async {
-    final db =
-        await instance.database;
+    final db = await instance.database;
 
-    return await db.delete(
+    final result = await db.query(
       'transactions',
-      where: 'id = ?',
-      whereArgs: [id],
+      where: 'date = ?',
+      whereArgs: [date],
+      orderBy: 'id DESC',
     );
+
+    return result
+        .map(
+          (json) => MoneyTransaction.fromMap(json),
+        )
+        .toList();
+  }
+
+  // ============================================================
+  // GET TRANSACTIONS BY CATEGORY
+  // ============================================================
+
+  Future<List<MoneyTransaction>> getTransactionsByCategory(
+    String category,
+  ) async {
+    final db = await instance.database;
+
+    final result = await db.query(
+      'transactions',
+      where: 'category = ?',
+      whereArgs: [category],
+      orderBy: 'id DESC',
+    );
+
+    return result
+        .map(
+          (json) => MoneyTransaction.fromMap(json),
+        )
+        .toList();
+  }
+
+  // ============================================================
+  // GET TRANSACTIONS BY ACCOUNT
+  // ============================================================
+
+  Future<List<MoneyTransaction>> getTransactionsByAccount(
+    String account,
+  ) async {
+    final db = await instance.database;
+
+    final result = await db.query(
+      'transactions',
+      where: 'account = ?',
+      whereArgs: [account],
+      orderBy: 'id DESC',
+    );
+
+    return result
+        .map(
+          (json) => MoneyTransaction.fromMap(json),
+        )
+        .toList();
   }
 
   // ============================================================
@@ -197,14 +244,34 @@ class MoneyDbHelper {
       return 0;
     }
 
-    final db =
-        await instance.database;
+    final db = await instance.database;
+
+    final data = transaction.toMap();
+
+    // ID update করার প্রয়োজন নেই
+    data.remove('id');
 
     return await db.update(
       'transactions',
-      transaction.toMap(),
+      data,
       where: 'id = ?',
       whereArgs: [transaction.id],
+    );
+  }
+
+  // ============================================================
+  // DELETE TRANSACTION
+  // ============================================================
+
+  Future<int> deleteTransaction(
+    int id,
+  ) async {
+    final db = await instance.database;
+
+    return await db.delete(
+      'transactions',
+      where: 'id = ?',
+      whereArgs: [id],
     );
   }
 
@@ -213,8 +280,7 @@ class MoneyDbHelper {
   // ============================================================
 
   Future<int> deleteAllTransactions() async {
-    final db =
-        await instance.database;
+    final db = await instance.database;
 
     return await db.delete(
       'transactions',
@@ -222,15 +288,82 @@ class MoneyDbHelper {
   }
 
   // ============================================================
+  // COUNT TRANSACTIONS
+  // ============================================================
+
+  Future<int> getTransactionCount() async {
+    final db = await instance.database;
+
+    final result = await db.rawQuery(
+      'SELECT COUNT(*) as count FROM transactions',
+    );
+
+    return Sqflite.firstIntValue(result) ?? 0;
+  }
+
+  // ============================================================
+  // TOTAL INCOME
+  // ============================================================
+
+  Future<double> getTotalIncome() async {
+    final db = await instance.database;
+
+    final result = await db.rawQuery('''
+      SELECT SUM(amount) as total
+      FROM transactions
+      WHERE type = 'Income'
+    ''');
+
+    final value = result.first['total'];
+
+    if (value == null) {
+      return 0.0;
+    }
+
+    return (value as num).toDouble();
+  }
+
+  // ============================================================
+  // TOTAL EXPENSE
+  // ============================================================
+
+  Future<double> getTotalExpense() async {
+    final db = await instance.database;
+
+    final result = await db.rawQuery('''
+      SELECT SUM(amount) as total
+      FROM transactions
+      WHERE type = 'Expense'
+    ''');
+
+    final value = result.first['total'];
+
+    if (value == null) {
+      return 0.0;
+    }
+
+    return (value as num).toDouble();
+  }
+
+  // ============================================================
+  // BALANCE
+  // ============================================================
+
+  Future<double> getBalance() async {
+    final income = await getTotalIncome();
+    final expense = await getTotalExpense();
+
+    return income - expense;
+  }
+
+  // ============================================================
   // CLOSE DATABASE
   // ============================================================
 
   Future<void> close() async {
-    final db =
-        await instance.database;
-
-    await db.close();
-
-    _database = null;
+    if (_database != null) {
+      await _database!.close();
+      _database = null;
+    }
   }
 }
