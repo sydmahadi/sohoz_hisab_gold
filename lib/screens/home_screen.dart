@@ -2,7 +2,7 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 
 import '../theme/app_theme.dart';
-import 'money_manager_screen.dart'; // মানি ম্যানেজার স্ক্রিন ইমপোর্ট
+import 'money_manager_screen.dart';
 import 'entry_screen.dart';
 import 'info_screen.dart';
 import 'note_screen.dart';
@@ -80,7 +80,7 @@ class HomeScreen extends StatelessWidget {
     return Scaffold(
       backgroundColor: AppTheme.background,
       appBar: AppBar(
-        title: const Text('সহজ হিসাব প্লাস'),
+        title: const Text('সহজ হিসাব গোল্ড'),
       ),
       body: Stack(
         children: [
@@ -253,7 +253,7 @@ class _HeaderCard extends StatelessWidget {
           const SizedBox(height: 11),
 
           const Text(
-            'সহজ হিসাব প্লাস',
+            'সহজ হিসাব গোল্ড',
             textAlign: TextAlign.center,
             style: TextStyle(
               color: Colors.white,
