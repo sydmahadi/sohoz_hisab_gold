@@ -85,7 +85,7 @@ class MoneyDbHelper {
     final db = await instance.database;
     int id = await db.insert('transactions', trans.toMap());
     
-    // ডাটা এন্ট্রি হওয়ার সাথে সাথে ড্রাইভে অটো ব্যাকআপ যাবে
+    // ডাটা এন্ট্রি হওয়ার সাথে সাথে ড্রাইভে অটো ব্যাকআপ আপলোড হবে
     autoBackupToDrive();
     return id;
   }
@@ -96,42 +96,65 @@ class MoneyDbHelper {
     return result.map((json) => MoneyTransaction.fromMap(json)).toList();
   }
 
-  // Google Drive Integration
+  // --- Google Drive Integration ---
+  
   static final GoogleSignIn _googleSignIn = GoogleSignIn(
-    scopes: [drive.DriveApi.driveFileScope],
+    scopes: [
+      drive.DriveApi.driveAppdataScope,
+      drive.DriveApi.driveFileScope,
+    ],
   );
 
-  static Future<void> autoBackupToDrive() async {
+  // গুগল সাইন-ইন মেথড
+  static Future<bool> signInWithGoogle() async {
     try {
-      GoogleSignInAccount? account = _googleSignIn.currentUser;
-      account ??= await _googleSignIn.signInSilently();
-      
-      if (account != null) {
-        var httpClient = await _googleSignIn.authenticatedClient();
-        if (httpClient == null) return;
-        
-        var driveApi = drive.DriveApi(httpClient);
-        final dbPath = await getDatabasesPath();
-        final path = join(dbPath, 'sohoz_money_manager.db');
-        File file = File(path);
-
-        if (await file.exists()) {
-          var media = drive.Media(file.openRead(), file.lengthSync());
-          var driveFile = drive.File();
-          driveFile.name = "sohoz_hisab_gold_backup.db";
-
-          await driveApi.files.create(driveFile, uploadMedia: media);
-        }
-      }
+      GoogleSignInAccount? account = await _googleSignIn.signInSilently();
+      account ??= await _googleSignIn.signIn();
+      return account != null;
     } catch (e) {
-      // ব্যাকআপ ব্যর্থ হলে শান্তভাবে হ্যান্ডেল করবে
+      return false;
     }
   }
 
-  static Future<bool> signInWithGoogle() async {
+  // ড্রাইভে অটো ব্যাকআপ আপলোড ও ফাইল আপডেট ফাংশন
+  static Future<bool> autoBackupToDrive() async {
     try {
-      final account = await _googleSignIn.signIn();
-      return account != null;
+      GoogleSignInAccount? account = _googleSignIn.currentUser;
+      account ??= await _googleSignIn.signInSilently();
+      account ??= await _googleSignIn.signIn();
+
+      if (account == null) return false;
+
+      var httpClient = await _googleSignIn.authenticatedClient();
+      if (httpClient == null) return false;
+
+      var driveApi = drive.DriveApi(httpClient);
+      final dbPath = await getDatabasesPath();
+      final path = join(dbPath, 'sohoz_money_manager.db');
+      File file = File(path);
+
+      if (await file.exists()) {
+        var media = drive.Media(file.openRead(), file.lengthSync());
+        
+        final list = await driveApi.files.list(
+          q: "name = 'sohoz_hisab_gold_backup.db'",
+          spaces: 'appDataFolder',
+        );
+
+        if (list.files != null && list.files!.isNotEmpty) {
+          String fileId = list.files!.first.id!;
+          var driveFile = drive.File();
+          await driveApi.files.update(driveFile, fileId, uploadMedia: media);
+        } else {
+          var driveFile = drive.File();
+          driveFile.name = "sohoz_hisab_gold_backup.db";
+          driveFile.parents = ["appDataFolder"];
+
+          await driveApi.files.create(driveFile, uploadMedia: media);
+        }
+        return true;
+      }
+      return false;
     } catch (e) {
       return false;
     }
