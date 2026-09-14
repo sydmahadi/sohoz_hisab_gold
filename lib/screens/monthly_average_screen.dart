@@ -102,16 +102,16 @@ class _MonthlyAverageScreenState extends State<MonthlyAverageScreen> {
                       size: 46,
                     ),
                     const SizedBox(height: 12),
-                    const Text(
+                    Text(
                       'মাসিক গড় হিসাব',
                       style: TextStyle(
-                        color: AppTheme.textDark,
+                        color: AppTheme.textPrimary,
                         fontSize: 20,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
                     const SizedBox(height: 8),
-                    const Text(
+                    Text(
                       'আপনার দেওয়া দিনের হিসাব থেকে ৩০ দিনের মাসিক গড় বের করুন',
                       textAlign: TextAlign.center,
                       style: TextStyle(
@@ -132,7 +132,7 @@ class _MonthlyAverageScreenState extends State<MonthlyAverageScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    const Text(
+                    Text(
                       'হিসাবের ধরন',
                       style: TextStyle(
                         color: AppTheme.goldLight,
@@ -171,7 +171,7 @@ class _MonthlyAverageScreenState extends State<MonthlyAverageScreen> {
                             if (states.contains(WidgetState.selected)) {
                               return Colors.black;
                             }
-                            return AppTheme.textDark;
+                            return AppTheme.textPrimary;
                           },
                         ),
                         backgroundColor:
@@ -222,7 +222,7 @@ class _MonthlyAverageScreenState extends State<MonthlyAverageScreen> {
 
                     if (isTime) ...[
                       const SizedBox(height: 8),
-                      const Text(
+                      Text(
                         'সময় ঘণ্টা.মিনিট ফরম্যাটে লিখুন। যেমন: 45.30',
                         style: TextStyle(
                           color: AppTheme.textMuted,
@@ -257,7 +257,7 @@ class _MonthlyAverageScreenState extends State<MonthlyAverageScreen> {
                         size: 46,
                       ),
                       const SizedBox(height: 10),
-                      const Text(
+                      Text(
                         'মাসিক গড়',
                         style: TextStyle(
                           color: AppTheme.textMuted,
@@ -268,14 +268,14 @@ class _MonthlyAverageScreenState extends State<MonthlyAverageScreen> {
                       Text(
                         _result!,
                         textAlign: TextAlign.center,
-                        style: const TextStyle(
+                        style: TextStyle(
                           color: AppTheme.goldLight,
                           fontSize: 25,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
                       const SizedBox(height: 6),
-                      const Text(
+                      Text(
                         '৩০ দিনের ভিত্তিতে',
                         style: TextStyle(
                           color: AppTheme.textMuted,
