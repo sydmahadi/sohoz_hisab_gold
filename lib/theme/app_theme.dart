@@ -32,14 +32,13 @@ class AppTheme {
   static const Color danger = Color(0xFF9B3D35);
 
   // ─────────────────────────────────────────────
-  // Legacy Aliases / Backwards Compatibility Getters
-  // (Fixes all GitHub build errors across screens)
+  // Legacy Static Constants (Allows use inside `const` widgets)
   // ─────────────────────────────────────────────
-  static Color get background => backgroundDark;
-  static Color get backgroundSecondary => backgroundSecondaryDark;
-  static Color get cardColor => cardColorDark;
-  static Color get cardLight => cardLightDark;
-  static Color get textMuted => textMutedDark;
+  static const Color background = backgroundDark;
+  static const Color backgroundSecondary = backgroundSecondaryDark;
+  static const Color cardColor = cardColorDark;
+  static const Color cardLight = cardLightDark;
+  static const Color textMuted = textMutedDark;
 
   // ─────────────────────────────────────────────
   // 1. Dark Theme
