@@ -12,6 +12,7 @@ class InfoScreen extends StatefulWidget {
 
 class _InfoScreenState extends State<InfoScreen> {
   late final WebViewController _controller;
+
   bool _isLoading = true;
 
   @override
@@ -19,7 +20,9 @@ class _InfoScreenState extends State<InfoScreen> {
     super.initState();
 
     _controller = WebViewController()
-      ..setJavaScriptMode(JavaScriptMode.unrestricted)
+      ..setJavaScriptMode(
+        JavaScriptMode.unrestricted,
+      )
       ..setNavigationDelegate(
         NavigationDelegate(
           onPageStarted: (_) {
@@ -60,11 +63,13 @@ class _InfoScreenState extends State<InfoScreen> {
         title: const Text('তথ্য দেখুন'),
         actions: [
           IconButton(
-            icon: const Icon(Icons.refresh_rounded),
-            tooltip: 'রিফ্রেশ',
             onPressed: () {
               _controller.reload();
             },
+            tooltip: 'রিফ্রেশ',
+            icon: const Icon(
+              Icons.refresh_rounded,
+            ),
           ),
         ],
       ),
@@ -76,7 +81,9 @@ class _InfoScreenState extends State<InfoScreen> {
 
           if (_isLoading)
             Container(
-              color: AppTheme.background.withOpacity(0.75),
+              color: AppTheme.background.withValues(
+                alpha: 0.75,
+              ),
               child: const Center(
                 child: CircularProgressIndicator(
                   color: AppTheme.gold,
