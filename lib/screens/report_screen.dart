@@ -27,96 +27,33 @@ class _ReportScreenState extends State<ReportScreen> {
   bool _savingImage = false;
   bool _savingPdf = false;
 
-  String? _errorMessage;
-
   final ScreenshotController _screenshotController =
       ScreenshotController();
 
   @override
   void initState() {
     super.initState();
-    _loadTransactions();
+    _loadReport();
   }
 
   // ============================================================
-  // DATE PARSER
+  // LOAD DATA
   // ============================================================
 
-  DateTime? _parseDate(String value) {
-    final text = value.trim();
-
-    if (text.isEmpty) return null;
-
-    // Standard ISO:
-    // 2026-09-14
-    // 2026-09-14T12:30:00
-    final iso = DateTime.tryParse(text);
-    if (iso != null) {
-      return iso;
-    }
-
-    // dd/MM/yyyy
-    try {
-      return DateFormat('dd/MM/yyyy').parseStrict(text);
-    } catch (_) {}
-
-    // dd-MM-yyyy
-    try {
-      return DateFormat('dd-MM-yyyy').parseStrict(text);
-    } catch (_) {}
-
-    // dd.MM.yyyy
-    try {
-      return DateFormat('dd.MM.yyyy').parseStrict(text);
-    } catch (_) {}
-
-    // yyyy/MM/dd
-    try {
-      return DateFormat('yyyy/MM/dd').parseStrict(text);
-    } catch (_) {}
-
-    return null;
-  }
-
-  // ============================================================
-  // LOAD TRANSACTIONS
-  // ============================================================
-
-  Future<void> _loadTransactions() async {
-    if (!mounted) return;
-
+  Future<void> _loadReport() async {
     setState(() {
       _loading = true;
-      _errorMessage = null;
     });
 
     try {
-      final all =
+      final data =
           await MoneyDbHelper.instance.getAllTransactions();
-
-      final List<MoneyTransaction> filtered = [];
-
-      for (final transaction in all) {
-        final date = _parseDate(transaction.date);
-
-        if (date == null) {
-          // Date parse না হলেও transaction বাদ দেব না
-          // যদি current month-এর তথ্য বোঝা সম্ভব না হয়।
-          continue;
-        }
-
-        if (date.year == _selectedMonth.year &&
-            date.month == _selectedMonth.month) {
-          filtered.add(transaction);
-        }
-      }
 
       if (!mounted) return;
 
       setState(() {
-        _transactions = filtered;
+        _transactions = data;
         _loading = false;
-        _errorMessage = null;
       });
     } catch (e) {
       if (!mounted) return;
@@ -124,9 +61,140 @@ class _ReportScreenState extends State<ReportScreen> {
       setState(() {
         _transactions = [];
         _loading = false;
-        _errorMessage = e.toString();
       });
     }
+  }
+
+  // ============================================================
+  // DATE PARSER
+  // Supports dd/MM/yyyy and common database formats
+  // ============================================================
+
+  DateTime? _parseDate(String date) {
+    final value = date.trim();
+
+    final formats = [
+      'dd/MM/yyyy',
+      'dd-MM-yyyy',
+      'dd.MM.yyyy',
+      'yyyy/MM/dd',
+      'yyyy-MM-dd',
+      'yyyy.MM.dd',
+      'dd/MM/yyyy HH:mm',
+      'dd-MM-yyyy HH:mm',
+      'yyyy-MM-dd HH:mm:ss',
+      'yyyy-MM-dd HH:mm',
+    ];
+
+    for (final format in formats) {
+      try {
+        return DateFormat(format).parseStrict(value);
+      } catch (_) {}
+    }
+
+    try {
+      return DateTime.tryParse(value);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  List<MoneyTransaction> get _monthlyTransactions {
+    final result = _transactions.where((item) {
+      final date = _parseDate(item.date);
+
+      if (date == null) return false;
+
+      return date.year == _selectedMonth.year &&
+          date.month == _selectedMonth.month;
+    }).toList();
+
+    return result;
+  }
+
+  // ============================================================
+  // INCOME / EXPENSE / TRANSFER
+  // ============================================================
+
+  List<MoneyTransaction> get _incomeTransactions {
+    return _monthlyTransactions
+        .where(
+          (e) => e.type.toLowerCase() == 'income',
+        )
+        .toList();
+  }
+
+  List<MoneyTransaction> get _expenseTransactions {
+    return _monthlyTransactions
+        .where(
+          (e) => e.type.toLowerCase() == 'expense',
+        )
+        .toList();
+  }
+
+  List<MoneyTransaction> get _transferTransactions {
+    return _monthlyTransactions
+        .where(
+          (e) => e.type.toLowerCase() == 'transfer',
+        )
+        .toList();
+  }
+
+  double get _totalIncome {
+    return _incomeTransactions.fold<double>(
+      0,
+      (sum, item) => sum + item.amount,
+    );
+  }
+
+  double get _totalExpense {
+    return _expenseTransactions.fold<double>(
+      0,
+      (sum, item) => sum + item.amount,
+    );
+  }
+
+  double get _balance {
+    return _totalIncome - _totalExpense;
+  }
+
+  // ============================================================
+  // CATEGORY TOTAL
+  // ============================================================
+
+  Map<String, double> _categoryTotals(
+    List<MoneyTransaction> transactions,
+  ) {
+    final Map<String, double> result = {};
+
+    for (final item in transactions) {
+      result[item.category] =
+          (result[item.category] ?? 0) + item.amount;
+    }
+
+    return result;
+  }
+
+  Map<String, double> get _incomeCategories {
+    final result = _categoryTotals(_incomeTransactions);
+
+    final entries = result.entries.toList()
+      ..sort(
+        (a, b) => b.value.compareTo(a.value),
+      );
+
+    return Map.fromEntries(entries);
+  }
+
+  Map<String, double> get _expenseCategories {
+    final result = _categoryTotals(_expenseTransactions);
+
+    final entries = result.entries.toList()
+      ..sort(
+        (a, b) => b.value.compareTo(a.value),
+      );
+
+    return Map.fromEntries(entries);
   }
 
   // ============================================================
@@ -138,11 +206,8 @@ class _ReportScreenState extends State<ReportScreen> {
       _selectedMonth = DateTime(
         _selectedMonth.year,
         _selectedMonth.month - 1,
-        1,
       );
     });
-
-    _loadTransactions();
   }
 
   void _nextMonth() {
@@ -150,701 +215,129 @@ class _ReportScreenState extends State<ReportScreen> {
       _selectedMonth = DateTime(
         _selectedMonth.year,
         _selectedMonth.month + 1,
-        1,
       );
     });
-
-    _loadTransactions();
   }
 
-  String _monthName() {
-    return DateFormat(
-      'MMMM yyyy',
-      'en',
-    ).format(_selectedMonth);
-  }
-
-  String _money(double value) {
-    return '৳ ${value.toStringAsFixed(2)}';
-  }
-
-  // ============================================================
-  // TOTALS
-  // ============================================================
-
-  double get _totalIncome {
-    double total = 0;
-
-    for (final e in _transactions) {
-      if (_isType(e.type, 'income')) {
-        total += e.amount;
-      }
-    }
-
-    return total;
-  }
-
-  double get _totalExpense {
-    double total = 0;
-
-    for (final e in _transactions) {
-      if (_isType(e.type, 'expense')) {
-        total += e.amount;
-      }
-    }
-
-    return total;
-  }
-
-  double get _totalTransfer {
-    double total = 0;
-
-    for (final e in _transactions) {
-      if (_isType(e.type, 'transfer')) {
-        total += e.amount;
-      }
-    }
-
-    return total;
-  }
-
-  double get _balance {
-    return _totalIncome - _totalExpense;
-  }
-
-  bool _isType(String value, String expected) {
-    return value.trim().toLowerCase() ==
-        expected.trim().toLowerCase();
-  }
-
-  // ============================================================
-  // CATEGORIES
-  // ============================================================
-
-  Map<String, double> get _incomeCategories {
-    final Map<String, double> result = {};
-
-    for (final transaction in _transactions) {
-      if (!_isType(transaction.type, 'income')) {
-        continue;
-      }
-
-      final category =
-          transaction.category.trim().isEmpty
-              ? 'অন্যান্য'
-              : transaction.category.trim();
-
-      result[category] =
-          (result[category] ?? 0) + transaction.amount;
-    }
-
-    return result;
-  }
-
-  Map<String, double> get _expenseCategories {
-    final Map<String, double> result = {};
-
-    for (final transaction in _transactions) {
-      if (!_isType(transaction.type, 'expense')) {
-        continue;
-      }
-
-      final category =
-          transaction.category.trim().isEmpty
-              ? 'অন্যান্য'
-              : transaction.category.trim();
-
-      result[category] =
-          (result[category] ?? 0) + transaction.amount;
-    }
-
-    return result;
-  }
-
-  // ============================================================
-  // EMPTY STATE
-  // ============================================================
-
-  Widget _emptyState() {
-    return Container(
-      width: double.infinity,
-      margin: const EdgeInsets.all(14),
-      padding: const EdgeInsets.symmetric(
-        horizontal: 20,
-        vertical: 40,
-      ),
-      decoration: BoxDecoration(
-        color: AppTheme.cardColor,
-        borderRadius: BorderRadius.circular(22),
-        border: Border.all(
-          color: AppTheme.gold.withOpacity(0.15),
-        ),
-      ),
-      child: Column(
-        children: [
-          Container(
-            width: 72,
-            height: 72,
-            decoration: BoxDecoration(
-              color: AppTheme.gold.withOpacity(0.10),
-              shape: BoxShape.circle,
-            ),
-            child: Icon(
-              Icons.receipt_long_rounded,
-              size: 36,
-              color: AppTheme.gold,
-            ),
-          ),
-          const SizedBox(height: 16),
-          Text(
-            'এই মাসে কোনো লেনদেন নেই',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              color: AppTheme.textPrimary,
-              fontSize: 17,
-              fontWeight: FontWeight.w800,
-            ),
-          ),
-          const SizedBox(height: 7),
-          Text(
-            '${_monthName()} মাসের কোনো Income, Expense বা Transfer পাওয়া যায়নি।',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              color: AppTheme.textMuted,
-              fontSize: 12,
-            ),
-          ),
-          const SizedBox(height: 18),
-          OutlinedButton.icon(
-            onPressed: _loadTransactions,
-            icon: const Icon(Icons.refresh_rounded),
-            label: const Text('Refresh'),
-            style: OutlinedButton.styleFrom(
-              foregroundColor: AppTheme.gold,
-              side: BorderSide(
-                color: AppTheme.gold.withOpacity(0.35),
-              ),
-            ),
-          ),
-        ],
-      ),
+  Future<void> _selectMonth() async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _selectedMonth,
+      firstDate: DateTime(2020),
+      lastDate: DateTime(2100),
+      helpText: 'রিপোর্টের মাস নির্বাচন করুন',
     );
+
+    if (picked == null) return;
+
+    setState(() {
+      _selectedMonth = DateTime(
+        picked.year,
+        picked.month,
+      );
+    });
   }
 
   // ============================================================
-  // ERROR STATE
+  // MONEY FORMAT
   // ============================================================
 
-  Widget _errorState() {
-    return Center(
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.all(22),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(
-              Icons.error_outline_rounded,
-              size: 60,
-              color: Colors.redAccent,
-            ),
-            const SizedBox(height: 15),
-            Text(
-              'রিপোর্ট লোড করা যায়নি',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                color: AppTheme.textPrimary,
-                fontSize: 18,
-                fontWeight: FontWeight.w800,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              _errorMessage ?? 'অজানা সমস্যা হয়েছে',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                color: AppTheme.textMuted,
-                fontSize: 11,
-              ),
-            ),
-            const SizedBox(height: 20),
-            ElevatedButton.icon(
-              onPressed: _loadTransactions,
-              icon: const Icon(Icons.refresh_rounded),
-              label: const Text('আবার চেষ্টা করুন'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppTheme.gold,
-                foregroundColor: Colors.black,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
+  String _money(double amount) {
+    return '৳ ${amount.toStringAsFixed(2)}';
   }
 
   // ============================================================
-  // SUMMARY CARD
-  // ============================================================
-
-  Widget _summaryCard({
-    required String title,
-    required double amount,
-    required IconData icon,
-    required Color color,
-  }) {
-    return Container(
-      padding: const EdgeInsets.all(13),
-      decoration: BoxDecoration(
-        color: AppTheme.cardColor,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: color.withOpacity(0.14),
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment:
-            CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(
-                icon,
-                size: 18,
-                color: color,
-              ),
-              const SizedBox(width: 6),
-              Expanded(
-                child: Text(
-                  title,
-                  style: TextStyle(
-                    color: AppTheme.textMuted,
-                    fontSize: 11,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          FittedBox(
-            alignment: Alignment.centerLeft,
-            fit: BoxFit.scaleDown,
-            child: Text(
-              _money(amount),
-              style: TextStyle(
-                color: color,
-                fontSize: 17,
-                fontWeight: FontWeight.w800,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // ============================================================
-  // BALANCE
-  // ============================================================
-
-  Widget _balanceCard() {
-    final positive = _balance >= 0;
-
-    final color =
-        positive ? Colors.greenAccent : Colors.redAccent;
-
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppTheme.cardColor,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(
-          color: color.withOpacity(0.18),
-        ),
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 46,
-            height: 46,
-            decoration: BoxDecoration(
-              color: color.withOpacity(0.10),
-              shape: BoxShape.circle,
-            ),
-            child: Icon(
-              positive
-                  ? Icons.account_balance_wallet_rounded
-                  : Icons.warning_amber_rounded,
-              color: color,
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment:
-                  CrossAxisAlignment.start,
-              children: [
-                Text(
-                  positive
-                      ? 'বর্তমান ব্যালেন্স'
-                      : 'বর্তমান ঘাটতি',
-                  style: TextStyle(
-                    color: AppTheme.textMuted,
-                    fontSize: 11,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                FittedBox(
-                  alignment: Alignment.centerLeft,
-                  fit: BoxFit.scaleDown,
-                  child: Text(
-                    _money(_balance.abs()),
-                    style: TextStyle(
-                      color: color,
-                      fontSize: 22,
-                      fontWeight: FontWeight.w900,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // ============================================================
-  // CATEGORY CARD
-  // ============================================================
-
-  Widget _categoryCard({
-    required String title,
-    required double amount,
-    required Map<String, double> categories,
-    required bool income,
-  }) {
-    final color =
-        income ? Colors.greenAccent : Colors.redAccent;
-
-    return Container(
-      padding: const EdgeInsets.all(15),
-      decoration: BoxDecoration(
-        color: AppTheme.cardColor,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(
-          color: color.withOpacity(0.13),
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment:
-            CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                width: 8,
-                height: 8,
-                decoration: BoxDecoration(
-                  color: color,
-                  shape: BoxShape.circle,
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  title,
-                  style: TextStyle(
-                    color: AppTheme.textPrimary,
-                    fontSize: 14,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 9),
-          FittedBox(
-            alignment: Alignment.centerLeft,
-            fit: BoxFit.scaleDown,
-            child: Text(
-              _money(amount),
-              style: TextStyle(
-                color: color,
-                fontSize: 19,
-                fontWeight: FontWeight.w900,
-              ),
-            ),
-          ),
-          const SizedBox(height: 13),
-          if (categories.isEmpty)
-            Text(
-              'কোনো তথ্য নেই',
-              style: TextStyle(
-                color: AppTheme.textMuted,
-                fontSize: 11,
-              ),
-            )
-          else
-            ...categories.entries.map(
-              (entry) => Padding(
-                padding:
-                    const EdgeInsets.only(bottom: 8),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        entry.key,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          color: AppTheme.textMuted,
-                          fontSize: 11,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 5),
-                    Flexible(
-                      child: Text(
-                        _money(entry.value),
-                        textAlign: TextAlign.right,
-                        style: TextStyle(
-                          color: AppTheme.textPrimary,
-                          fontSize: 10,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-        ],
-      ),
-    );
-  }
-
-  // ============================================================
-  // INFO ROW
-  // ============================================================
-
-  Widget _infoRow(
-    String title,
-    String value, {
-    Color? color,
-  }) {
-    return Row(
-      children: [
-        Expanded(
-          child: Text(
-            title,
-            style: TextStyle(
-              color: AppTheme.textMuted,
-              fontSize: 12,
-            ),
-          ),
-        ),
-        Text(
-          value,
-          style: TextStyle(
-            color: color ?? AppTheme.textPrimary,
-            fontSize: 12,
-            fontWeight: FontWeight.w800,
-          ),
-        ),
-      ],
-    );
-  }
-
-  // ============================================================
-  // MAIN REPORT
-  // ============================================================
-
-  Widget _reportContent() {
-    final positive = _balance >= 0;
-
-    return Container(
-      margin: const EdgeInsets.symmetric(
-        horizontal: 14,
-        vertical: 4,
-      ),
-      padding: const EdgeInsets.all(17),
-      decoration: BoxDecoration(
-        color: AppTheme.backgroundSecondary,
-        borderRadius: BorderRadius.circular(22),
-        border: Border.all(
-          color: AppTheme.gold.withOpacity(0.16),
-        ),
-      ),
-      child: Column(
-        children: [
-          Text(
-            'সহজ হিসাব',
-            style: TextStyle(
-              color: AppTheme.goldLight,
-              fontSize: 24,
-              fontWeight: FontWeight.w900,
-            ),
-          ),
-          const SizedBox(height: 5),
-          Text(
-            'মাসিক আয়-ব্যয়ের রিপোর্ট',
-            style: TextStyle(
-              color: AppTheme.textPrimary,
-              fontSize: 14,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            _monthName(),
-            style: TextStyle(
-              color: AppTheme.textMuted,
-              fontSize: 12,
-            ),
-          ),
-          const SizedBox(height: 18),
-          Divider(
-            color: AppTheme.gold.withOpacity(0.14),
-            height: 1,
-          ),
-          const SizedBox(height: 16),
-
-          Row(
-            children: [
-              Expanded(
-                child: _summaryCard(
-                  title: 'মোট আয়',
-                  amount: _totalIncome,
-                  icon: Icons.south_rounded,
-                  color: Colors.greenAccent,
-                ),
-              ),
-              const SizedBox(width: 9),
-              Expanded(
-                child: _summaryCard(
-                  title: 'মোট ব্যয়',
-                  amount: _totalExpense,
-                  icon: Icons.north_rounded,
-                  color: Colors.redAccent,
-                ),
-              ),
-            ],
-          ),
-
-          const SizedBox(height: 10),
-
-          _balanceCard(),
-
-          const SizedBox(height: 14),
-
-          Row(
-            crossAxisAlignment:
-                CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                child: _categoryCard(
-                  title: 'আয়',
-                  amount: _totalIncome,
-                  categories: _incomeCategories,
-                  income: true,
-                ),
-              ),
-              const SizedBox(width: 9),
-              Expanded(
-                child: _categoryCard(
-                  title: 'ব্যয়',
-                  amount: _totalExpense,
-                  categories: _expenseCategories,
-                  income: false,
-                ),
-              ),
-            ],
-          ),
-
-          const SizedBox(height: 12),
-
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(15),
-            decoration: BoxDecoration(
-              color: AppTheme.cardColor,
-              borderRadius: BorderRadius.circular(17),
-            ),
-            child: Column(
-              children: [
-                _infoRow(
-                  'মোট লেনদেন',
-                  '${_transactions.length} টি',
-                ),
-                const SizedBox(height: 11),
-                _infoRow(
-                  'মোট ট্রান্সফার',
-                  _money(_totalTransfer),
-                ),
-                const SizedBox(height: 11),
-                _infoRow(
-                  'ফলাফল',
-                  positive ? 'উদ্বৃত্ত' : 'ঘাটতি',
-                  color: positive
-                      ? Colors.greenAccent
-                      : Colors.redAccent,
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // ============================================================
-  // A4 IMAGE REPORT
+  // A4 REPORT
   // ============================================================
 
   Widget _buildA4Report() {
-    final positive = _balance >= 0;
+    final income = _incomeCategories.entries.toList();
+    final expense = _expenseCategories.entries.toList();
 
-    return Material(
+    return Container(
+      width: 794,
       color: Colors.white,
-      child: Container(
-        width: 794,
-        color: Colors.white,
-        padding: const EdgeInsets.fromLTRB(
-          42,
-          38,
-          42,
-          30,
+      padding: const EdgeInsets.fromLTRB(
+        35,
+        35,
+        35,
+        28,
+      ),
+      child: DefaultTextStyle(
+        style: const TextStyle(
+          color: Colors.black,
+          fontFamily: 'Arial',
         ),
         child: Column(
           crossAxisAlignment:
               CrossAxisAlignment.stretch,
           children: [
-            Center(
-              child: Column(
+            const Text(
+              'সহজ হিসাব',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 27,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+
+            const SizedBox(height: 5),
+
+            const Text(
+              'মাসিক আয়-ব্যয়ের রিপোর্ট',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+
+            const SizedBox(height: 5),
+
+            Text(
+              DateFormat('MMMM yyyy').format(
+                _selectedMonth,
+              ),
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+
+            const SizedBox(height: 25),
+
+            Container(
+              decoration: BoxDecoration(
+                border: Border.all(
+                  color: Colors.black54,
+                  width: 1,
+                ),
+                borderRadius:
+                    BorderRadius.circular(8),
+              ),
+              child: Row(
+                crossAxisAlignment:
+                    CrossAxisAlignment.start,
                 children: [
-                  const Text(
-                    'সহজ হিসাব',
-                    style: TextStyle(
-                      color: Colors.black87,
-                      fontSize: 28,
-                      fontWeight: FontWeight.w900,
+                  Expanded(
+                    child: _buildA4Side(
+                      title: 'আয়',
+                      items: income,
+                      total: _totalIncome,
                     ),
                   ),
-                  const SizedBox(height: 6),
-                  const Text(
-                    'মাসিক আয়-ব্যয়ের রিপোর্ট',
-                    style: TextStyle(
-                      color: Colors.black54,
-                      fontSize: 15,
-                      fontWeight: FontWeight.w600,
-                    ),
+
+                  Container(
+                    width: 1,
+                    color: Colors.black54,
                   ),
-                  const SizedBox(height: 6),
-                  Text(
-                    _monthName(),
-                    style: const TextStyle(
-                      color: Colors.black45,
-                      fontSize: 12,
+
+                  Expanded(
+                    child: _buildA4Side(
+                      title: 'ব্যয়',
+                      items: expense,
+                      total: _totalExpense,
                     ),
                   ),
                 ],
@@ -852,118 +345,92 @@ class _ReportScreenState extends State<ReportScreen> {
             ),
 
             const SizedBox(height: 22),
-            const Divider(),
-            const SizedBox(height: 20),
-
-            Row(
-              children: [
-                Expanded(
-                  child: _imageSummary(
-                    'মোট আয়',
-                    _totalIncome,
-                    Colors.green.shade800,
-                    const Color(0xFFEAF7EE),
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: _imageSummary(
-                    'মোট ব্যয়',
-                    _totalExpense,
-                    Colors.red.shade800,
-                    const Color(0xFFFFEEEE),
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: _imageSummary(
-                    'ব্যালেন্স',
-                    _balance.abs(),
-                    positive
-                        ? Colors.green.shade800
-                        : Colors.red.shade800,
-                    const Color(0xFFFFF8E8),
-                  ),
-                ),
-              ],
-            ),
-
-            const SizedBox(height: 20),
-
-            Row(
-              crossAxisAlignment:
-                  CrossAxisAlignment.start,
-              children: [
-                Expanded(
-                  child: _imageCategory(
-                    title: 'আয়ের বিবরণ',
-                    amount: _totalIncome,
-                    categories: _incomeCategories,
-                    color: Colors.green.shade800,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: _imageCategory(
-                    title: 'ব্যয়ের বিবরণ',
-                    amount: _totalExpense,
-                    categories: _expenseCategories,
-                    color: Colors.red.shade800,
-                  ),
-                ),
-              ],
-            ),
-
-            const SizedBox(height: 20),
 
             Container(
-              padding: const EdgeInsets.all(15),
+              padding:
+                  const EdgeInsets.symmetric(
+                vertical: 16,
+                horizontal: 20,
+              ),
               decoration: BoxDecoration(
-                color: const Color(0xFFF7F7F7),
-                borderRadius: BorderRadius.circular(12),
                 border: Border.all(
-                  color: Colors.black12,
+                  color: _balance >= 0
+                      ? Colors.green.shade700
+                      : Colors.red.shade700,
+                  width: 1.2,
                 ),
+                borderRadius:
+                    BorderRadius.circular(8),
               ),
               child: Column(
                 children: [
-                  _imageInfo(
-                    'মোট লেনদেন',
-                    '${_transactions.length} টি',
+                  Text(
+                    _balance >= 0
+                        ? 'উদ্বৃত্ত'
+                        : 'ঘাটতি',
+                    style: TextStyle(
+                      color: _balance >= 0
+                          ? Colors.green.shade800
+                          : Colors.red.shade800,
+                      fontSize: 18,
+                      fontWeight: FontWeight.w900,
+                    ),
                   ),
-                  const SizedBox(height: 9),
-                  _imageInfo(
-                    'মোট ট্রান্সফার',
-                    _money(_totalTransfer),
-                  ),
-                  const SizedBox(height: 9),
-                  _imageInfo(
-                    'ফলাফল',
-                    positive ? 'উদ্বৃত্ত' : 'ঘাটতি',
+
+                  const SizedBox(height: 5),
+
+                  Text(
+                    _money(_balance.abs()),
+                    style: TextStyle(
+                      color: _balance >= 0
+                          ? Colors.green.shade800
+                          : Colors.red.shade800,
+                      fontSize: 25,
+                      fontWeight: FontWeight.w900,
+                    ),
                   ),
                 ],
               ),
             ),
 
-            const SizedBox(height: 28),
+            const SizedBox(height: 15),
 
-            // ==================================================
-            // WATERMARK - BOTTOM RIGHT
-            // ==================================================
+            Text(
+              'মোট লেনদেন: '
+              '${_monthlyTransactions.length} টি',
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
 
-            Container(
-              padding: const EdgeInsets.only(top: 9),
-              decoration: const BoxDecoration(
-                border: Border(
-                  top: BorderSide(
-                    color: Color(0xFFE5E5E5),
-                  ),
+            const SizedBox(height: 6),
+
+            if (_transferTransactions.isNotEmpty)
+              Text(
+                'মোট ট্রান্সফার: '
+                '${_transferTransactions.length} টি',
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
                 ),
               ),
-              child: Align(
-                alignment: Alignment.centerRight,
+
+            // ==================================================
+            // WATERMARK
+            // ONLY FOR SAVED IMAGE / PDF
+            // ==================================================
+
+            const SizedBox(height: 22),
+
+            Align(
+              alignment: Alignment.bottomRight,
+              child: Opacity(
+                opacity: 0.38,
                 child: SizedBox(
-                  width: 180,
+                  width: 190,
                   child: Column(
                     crossAxisAlignment:
                         CrossAxisAlignment.center,
@@ -972,25 +439,25 @@ class _ReportScreenState extends State<ReportScreen> {
                         'সহজ হিসাব',
                         textAlign: TextAlign.center,
                         style: TextStyle(
-                          color: Color(0xFFBDB7A8),
-                          fontSize: 9,
-                          fontWeight: FontWeight.w700,
+                          color: Color(0xFF777777),
+                          fontSize: 10,
+                          fontWeight:
+                              FontWeight.w600,
                         ),
                       ),
-                      SizedBox(height: 2),
                       Text(
                         'Sayeed Mahadi',
                         textAlign: TextAlign.center,
                         style: TextStyle(
-                          color: Color(0xFFC8C3B7),
-                          fontSize: 8,
+                          color: Color(0xFF777777),
+                          fontSize: 9,
                         ),
                       ),
                       Text(
                         'm.talpatarsepai@gmail.com',
                         textAlign: TextAlign.center,
                         style: TextStyle(
-                          color: Color(0xFFC8C3B7),
+                          color: Color(0xFF777777),
                           fontSize: 8,
                         ),
                       ),
@@ -1005,142 +472,142 @@ class _ReportScreenState extends State<ReportScreen> {
     );
   }
 
-  Widget _imageSummary(
-    String title,
-    double amount,
-    Color color,
-    Color background,
-  ) {
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: background,
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Column(
-        crossAxisAlignment:
-            CrossAxisAlignment.start,
-        children: [
-          Text(
-            title,
-            style: const TextStyle(
-              color: Colors.black54,
-              fontSize: 11,
-            ),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            _money(amount),
-            style: TextStyle(
-              color: color,
-              fontSize: 18,
-              fontWeight: FontWeight.w900,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+  // ============================================================
+  // A4 SIDE
+  // ============================================================
 
-  Widget _imageCategory({
+  Widget _buildA4Side({
     required String title,
-    required double amount,
-    required Map<String, double> categories,
-    required Color color,
+    required List<MapEntry<String, double>> items,
+    required double total,
   }) {
-    return Container(
-      padding: const EdgeInsets.all(15),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: Colors.black12,
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment:
-            CrossAxisAlignment.start,
-        children: [
-          Text(
-            title,
-            style: const TextStyle(
-              color: Colors.black87,
-              fontSize: 15,
-              fontWeight: FontWeight.w800,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            _money(amount),
-            style: TextStyle(
-              color: color,
-              fontSize: 20,
-              fontWeight: FontWeight.w900,
-            ),
-          ),
-          const SizedBox(height: 12),
-          if (categories.isEmpty)
-            const Text(
-              'কোনো তথ্য নেই',
-              style: TextStyle(
-                color: Colors.black45,
-                fontSize: 11,
-              ),
-            )
-          else
-            ...categories.entries.map(
-              (entry) => Padding(
-                padding:
-                    const EdgeInsets.only(bottom: 7),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        entry.key,
-                        style: const TextStyle(
-                          color: Colors.black87,
-                          fontSize: 11,
-                        ),
-                      ),
-                    ),
-                    Text(
-                      _money(entry.value),
-                      style: const TextStyle(
-                        color: Colors.black87,
-                        fontSize: 11,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-        ],
-      ),
-    );
-  }
-
-  Widget _imageInfo(
-    String title,
-    String value,
-  ) {
-    return Row(
+    return Column(
+      crossAxisAlignment:
+          CrossAxisAlignment.stretch,
       children: [
-        Expanded(
+        Container(
+          padding:
+              const EdgeInsets.symmetric(
+            vertical: 11,
+          ),
+          color: const Color(0xFFEFEFEF),
           child: Text(
             title,
+            textAlign: TextAlign.center,
             style: const TextStyle(
-              color: Colors.black54,
-              fontSize: 11,
+              fontSize: 17,
+              fontWeight: FontWeight.w900,
             ),
           ),
         ),
-        Text(
-          value,
-          style: const TextStyle(
-            color: Colors.black87,
-            fontSize: 12,
-            fontWeight: FontWeight.w800,
+
+        if (items.isEmpty)
+          const Padding(
+            padding: EdgeInsets.all(20),
+            child: Text(
+              'কোনো তথ্য নেই',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 12,
+              ),
+            ),
+          ),
+
+        ...items.asMap().entries.map(
+          (entry) {
+            final index = entry.key;
+            final item = entry.value;
+
+            return Container(
+              padding:
+                  const EdgeInsets.symmetric(
+                horizontal: 10,
+                vertical: 9,
+              ),
+              decoration:
+                  const BoxDecoration(
+                border: Border(
+                  bottom: BorderSide(
+                    color: Colors.black12,
+                  ),
+                ),
+              ),
+              child: Row(
+                children: [
+                  SizedBox(
+                    width: 22,
+                    child: Text(
+                      '${index + 1}.',
+                      style:
+                          const TextStyle(
+                        fontSize: 11,
+                        fontWeight:
+                            FontWeight.w700,
+                      ),
+                    ),
+                  ),
+
+                  Expanded(
+                    child: Text(
+                      item.key,
+                      style:
+                          const TextStyle(
+                        fontSize: 12,
+                        fontWeight:
+                            FontWeight.w600,
+                      ),
+                    ),
+                  ),
+
+                  const SizedBox(width: 5),
+
+                  Text(
+                    _money(item.value),
+                    textAlign:
+                        TextAlign.right,
+                    style:
+                        const TextStyle(
+                      fontSize: 11.5,
+                      fontWeight:
+                          FontWeight.w800,
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        ),
+
+        Container(
+          padding:
+              const EdgeInsets.symmetric(
+            horizontal: 10,
+            vertical: 12,
+          ),
+          color: const Color(0xFFF5F5F5),
+          child: Row(
+            children: [
+              const Expanded(
+                child: Text(
+                  'মোট',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight:
+                        FontWeight.w900,
+                  ),
+                ),
+              ),
+
+              Text(
+                _money(total),
+                style:
+                    const TextStyle(
+                  fontSize: 13,
+                  fontWeight:
+                      FontWeight.w900,
+                ),
+              ),
+            ],
           ),
         ),
       ],
@@ -1148,36 +615,31 @@ class _ReportScreenState extends State<ReportScreen> {
   }
 
   // ============================================================
-  // CAPTURE IMAGE
+  // CAPTURE A4 IMAGE
   // ============================================================
 
-  Future<Uint8List?> _captureImage() async {
-    try {
-      return await _screenshotController
-          .captureFromLongWidget(
-        _buildA4Report(),
-        delay: const Duration(
-          milliseconds: 300,
+  Future<Uint8List> _captureA4Image() async {
+    final image = await
+        _screenshotController
+            .captureFromLongWidget(
+      InheritedTheme.captureAll(
+        context,
+        Material(
+          color: Colors.white,
+          child: _buildA4Report(),
         ),
-        context: context,
-        pixelRatio: 2,
-        constraints: const BoxConstraints(
-          maxWidth: 794,
-        ),
-      );
-    } catch (e) {
-      if (!mounted) return null;
+      ),
+      delay:
+          const Duration(milliseconds: 500),
+      context: context,
+      pixelRatio: 2,
+      constraints:
+          const BoxConstraints(
+        maxWidth: 794,
+      ),
+    );
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'রিপোর্ট ছবি তৈরি করা যায়নি: $e',
-          ),
-        ),
-      );
-
-      return null;
-    }
+    return image;
   }
 
   // ============================================================
@@ -1192,45 +654,50 @@ class _ReportScreenState extends State<ReportScreen> {
     });
 
     try {
-      final image = await _captureImage();
+      final Uint8List image =
+          await _captureA4Image();
 
-      if (image == null) return;
+      final permission =
+          await Gal.requestAccess(
+        toAlbum: true,
+      );
 
-      bool access = await Gal.hasAccess();
-
-      if (!access) {
-        access = await Gal.requestAccess();
-      }
-
-      if (!access) {
+      if (!permission) {
         throw Exception(
-          'Gallery permission দেওয়া হয়নি',
+          'Gallery permission পাওয়া যায়নি',
         );
       }
+
+      final month =
+          DateFormat('MM-yyyy').format(
+        _selectedMonth,
+      );
 
       await Gal.putImageBytes(
         image,
         album: 'সহজ হিসাব',
         name:
-            'Shohoj_Hisab_Report_${DateFormat('yyyy_MM').format(_selectedMonth)}',
+            'Shohoj_Hisab_Report_$month',
       );
 
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
+      ScaffoldMessenger.of(context)
+          .showSnackBar(
         const SnackBar(
           content: Text(
-            'রিপোর্ট ছবি হিসেবে সংরক্ষণ হয়েছে',
+            'রিপোর্টটি Gallery-তে Save হয়েছে',
           ),
         ),
       );
     } catch (e) {
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
+      ScaffoldMessenger.of(context)
+          .showSnackBar(
         SnackBar(
           content: Text(
-            'ছবি সংরক্ষণ করা যায়নি: $e',
+            'Image Save করা যায়নি\n$e',
           ),
         ),
       );
@@ -1241,344 +708,6 @@ class _ReportScreenState extends State<ReportScreen> {
         });
       }
     }
-  }
-
-  // ============================================================
-  // PDF
-  // ============================================================
-
-  Future<Uint8List> _createPdfBytes() async {
-    final pdf = pw.Document();
-
-    final positive = _balance >= 0;
-
-    pdf.addPage(
-      pw.Page(
-        pageFormat: PdfPageFormat.a4,
-        margin: const pw.EdgeInsets.all(30),
-        build: (context) {
-          return pw.Column(
-            crossAxisAlignment:
-                pw.CrossAxisAlignment.stretch,
-            children: [
-              pw.Center(
-                child: pw.Column(
-                  children: [
-                    pw.Text(
-                      'Shohoj Hisab',
-                      style: pw.TextStyle(
-                        fontSize: 25,
-                        fontWeight:
-                            pw.FontWeight.bold,
-                      ),
-                    ),
-                    pw.SizedBox(height: 5),
-                    pw.Text(
-                      'Monthly Income & Expense Report',
-                      style: const pw.TextStyle(
-                        fontSize: 13,
-                      ),
-                    ),
-                    pw.SizedBox(height: 5),
-                    pw.Text(
-                      _monthName(),
-                      style: const pw.TextStyle(
-                        fontSize: 11,
-                        color: PdfColors.grey700,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-
-              pw.SizedBox(height: 18),
-              pw.Divider(),
-              pw.SizedBox(height: 15),
-
-              pw.Row(
-                children: [
-                  pw.Expanded(
-                    child: _pdfSummary(
-                      'Total Income',
-                      _totalIncome,
-                      PdfColors.green800,
-                    ),
-                  ),
-                  pw.SizedBox(width: 8),
-                  pw.Expanded(
-                    child: _pdfSummary(
-                      'Total Expense',
-                      _totalExpense,
-                      PdfColors.red800,
-                    ),
-                  ),
-                  pw.SizedBox(width: 8),
-                  pw.Expanded(
-                    child: _pdfSummary(
-                      'Balance',
-                      _balance.abs(),
-                      positive
-                          ? PdfColors.green800
-                          : PdfColors.red800,
-                    ),
-                  ),
-                ],
-              ),
-
-              pw.SizedBox(height: 17),
-
-              pw.Row(
-                crossAxisAlignment:
-                    pw.CrossAxisAlignment.start,
-                children: [
-                  pw.Expanded(
-                    child: _pdfCategory(
-                      title: 'Income Details',
-                      amount: _totalIncome,
-                      categories:
-                          _incomeCategories,
-                      color:
-                          PdfColors.green800,
-                    ),
-                  ),
-                  pw.SizedBox(width: 10),
-                  pw.Expanded(
-                    child: _pdfCategory(
-                      title: 'Expense Details',
-                      amount: _totalExpense,
-                      categories:
-                          _expenseCategories,
-                      color: PdfColors.red800,
-                    ),
-                  ),
-                ],
-              ),
-
-              pw.SizedBox(height: 17),
-
-              pw.Container(
-                padding:
-                    const pw.EdgeInsets.all(13),
-                color: PdfColors.grey100,
-                child: pw.Column(
-                  children: [
-                    _pdfInfo(
-                      'Total Transactions',
-                      '${_transactions.length}',
-                    ),
-                    pw.SizedBox(height: 7),
-                    _pdfInfo(
-                      'Total Transfer',
-                      _money(_totalTransfer),
-                    ),
-                    pw.SizedBox(height: 7),
-                    _pdfInfo(
-                      'Result',
-                      positive
-                          ? 'Surplus'
-                          : 'Deficit',
-                    ),
-                  ],
-                ),
-              ),
-
-              pw.Spacer(),
-
-              pw.Divider(
-                color: PdfColors.grey300,
-              ),
-
-              pw.SizedBox(height: 5),
-
-              // ==================================================
-              // PDF WATERMARK - BOTTOM RIGHT
-              // ==================================================
-
-              pw.Align(
-                alignment: pw.Alignment.centerRight,
-                child: pw.SizedBox(
-                  width: 180,
-                  child: pw.Column(
-                    crossAxisAlignment:
-                        pw.CrossAxisAlignment.center,
-                    children: [
-                      pw.Text(
-                        'সহজ হিসাব',
-                        textAlign:
-                            pw.TextAlign.center,
-                        style: pw.TextStyle(
-                          fontSize: 9,
-                          fontWeight:
-                              pw.FontWeight.bold,
-                          color: PdfColors.grey500,
-                        ),
-                      ),
-                      pw.Text(
-                        'Sayeed Mahadi',
-                        textAlign:
-                            pw.TextAlign.center,
-                        style: const pw.TextStyle(
-                          fontSize: 8,
-                          color:
-                              PdfColors.grey500,
-                        ),
-                      ),
-                      pw.Text(
-                        'm.talpatarsepai@gmail.com',
-                        textAlign:
-                            pw.TextAlign.center,
-                        style: const pw.TextStyle(
-                          fontSize: 8,
-                          color:
-                              PdfColors.grey500,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ],
-          );
-        },
-      ),
-    );
-
-    return pdf.save();
-  }
-
-  pw.Widget _pdfSummary(
-    String title,
-    double amount,
-    PdfColor color,
-  ) {
-    return pw.Container(
-      padding: const pw.EdgeInsets.all(10),
-      color: PdfColors.grey100,
-      child: pw.Column(
-        crossAxisAlignment:
-            pw.CrossAxisAlignment.start,
-        children: [
-          pw.Text(
-            title,
-            style: const pw.TextStyle(
-              fontSize: 8,
-              color: PdfColors.grey700,
-            ),
-          ),
-          pw.SizedBox(height: 5),
-          pw.Text(
-            _money(amount),
-            style: pw.TextStyle(
-              fontSize: 13,
-              fontWeight: pw.FontWeight.bold,
-              color: color,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  pw.Widget _pdfCategory({
-    required String title,
-    required double amount,
-    required Map<String, double> categories,
-    required PdfColor color,
-  }) {
-    return pw.Container(
-      padding: const pw.EdgeInsets.all(11),
-      decoration: pw.BoxDecoration(
-        border: pw.Border.all(
-          color: PdfColors.grey300,
-        ),
-      ),
-      child: pw.Column(
-        crossAxisAlignment:
-            pw.CrossAxisAlignment.start,
-        children: [
-          pw.Text(
-            title,
-            style: pw.TextStyle(
-              fontSize: 11,
-              fontWeight: pw.FontWeight.bold,
-            ),
-          ),
-          pw.SizedBox(height: 6),
-          pw.Text(
-            _money(amount),
-            style: pw.TextStyle(
-              fontSize: 14,
-              fontWeight: pw.FontWeight.bold,
-              color: color,
-            ),
-          ),
-          pw.SizedBox(height: 8),
-          if (categories.isEmpty)
-            pw.Text(
-              'No data',
-              style: const pw.TextStyle(
-                fontSize: 8,
-                color: PdfColors.grey600,
-              ),
-            )
-          else
-            ...categories.entries.map(
-              (entry) => pw.Padding(
-                padding:
-                    const pw.EdgeInsets.only(
-                  bottom: 5,
-                ),
-                child: pw.Row(
-                  children: [
-                    pw.Expanded(
-                      child: pw.Text(
-                        entry.key,
-                        style: const pw.TextStyle(
-                          fontSize: 8,
-                        ),
-                      ),
-                    ),
-                    pw.Text(
-                      _money(entry.value),
-                      style: pw.TextStyle(
-                        fontSize: 8,
-                        fontWeight:
-                            pw.FontWeight.bold,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-        ],
-      ),
-    );
-  }
-
-  pw.Widget _pdfInfo(
-    String title,
-    String value,
-  ) {
-    return pw.Row(
-      children: [
-        pw.Expanded(
-          child: pw.Text(
-            title,
-            style: const pw.TextStyle(
-              fontSize: 8,
-              color: PdfColors.grey700,
-            ),
-          ),
-        ),
-        pw.Text(
-          value,
-          style: pw.TextStyle(
-            fontSize: 8,
-            fontWeight: pw.FontWeight.bold,
-          ),
-        ),
-      ],
-    );
   }
 
   // ============================================================
@@ -1593,22 +722,56 @@ class _ReportScreenState extends State<ReportScreen> {
     });
 
     try {
-      final bytes = await _createPdfBytes();
+      final Uint8List image =
+          await _captureA4Image();
 
-      final fileName =
-          'Shohoj_Hisab_Report_${DateFormat('yyyy_MM').format(_selectedMonth)}.pdf';
+      final pdf = pw.Document();
+
+      final pdfImage =
+          pw.MemoryImage(image);
+
+      pdf.addPage(
+        pw.Page(
+          pageFormat: PdfPageFormat.a4,
+          margin: pw.EdgeInsets.zero,
+          build: (context) {
+            return pw.Image(
+              pdfImage,
+              fit: pw.BoxFit.contain,
+            );
+          },
+        ),
+      );
+
+      final month =
+          DateFormat('MM-yyyy').format(
+        _selectedMonth,
+      );
 
       await Printing.sharePdf(
-        bytes: bytes,
-        filename: fileName,
+        bytes: await pdf.save(),
+        filename:
+            'Shohoj_Hisab_Report_$month.pdf',
+      );
+
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context)
+          .showSnackBar(
+        const SnackBar(
+          content: Text(
+            'A4 PDF তৈরি হয়েছে',
+          ),
+        ),
       );
     } catch (e) {
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
+      ScaffoldMessenger.of(context)
+          .showSnackBar(
         SnackBar(
           content: Text(
-            'PDF তৈরি করা যায়নি: $e',
+            'PDF তৈরি করা যায়নি\n$e',
           ),
         ),
       );
@@ -1622,209 +785,337 @@ class _ReportScreenState extends State<ReportScreen> {
   }
 
   // ============================================================
-  // ACTION BUTTON
-  // ============================================================
-
-  Widget _actionButton({
-    required IconData icon,
-    required String title,
-    required VoidCallback onTap,
-    required bool loading,
-  }) {
-    return Expanded(
-      child: ElevatedButton.icon(
-        onPressed: loading ? null : onTap,
-        icon: loading
-            ? const SizedBox(
-                width: 18,
-                height: 18,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                ),
-              )
-            : Icon(icon),
-        label: Text(
-          title,
-          style: const TextStyle(
-            fontWeight: FontWeight.w800,
-          ),
-        ),
-        style: ElevatedButton.styleFrom(
-          backgroundColor: AppTheme.gold,
-          foregroundColor: Colors.black,
-          padding: const EdgeInsets.symmetric(
-            vertical: 13,
-          ),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(13),
-          ),
-        ),
-      ),
-    );
-  }
-
-  // ============================================================
-  // BUILD
+  // MAIN UI
   // ============================================================
 
   @override
   Widget build(BuildContext context) {
+    final dark = AppTheme.isDark;
+
     return Scaffold(
-      backgroundColor: AppTheme.background,
+      backgroundColor:
+          AppTheme.background,
 
       appBar: AppBar(
-        backgroundColor: AppTheme.background,
-        foregroundColor: AppTheme.textPrimary,
-        elevation: 0,
-        centerTitle: true,
-        title: const Text(
+        title: Text(
           'মাসিক রিপোর্ট',
           style: TextStyle(
+            color: dark
+                ? AppTheme.gold
+                : AppTheme.darkGreen,
             fontWeight: FontWeight.w800,
           ),
         ),
         actions: [
           IconButton(
-            onPressed:
-                _loading ? null : _loadTransactions,
-            icon: const Icon(
+            tooltip: 'Refresh',
+            onPressed: _loadReport,
+            icon: Icon(
               Icons.refresh_rounded,
+              color: dark
+                  ? AppTheme.gold
+                  : AppTheme.darkGreen,
             ),
           ),
         ],
       ),
 
-      body: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(
-              14,
-              5,
-              14,
-              9,
-            ),
-            child: Container(
-              padding: const EdgeInsets.symmetric(
-                horizontal: 4,
-                vertical: 3,
+      body: _loading
+          ? Center(
+              child:
+                  CircularProgressIndicator(
+                color: dark
+                    ? AppTheme.gold
+                    : AppTheme.darkGreen,
               ),
-              decoration: BoxDecoration(
-                color: AppTheme.cardColor,
-                borderRadius:
-                    BorderRadius.circular(15),
-                border: Border.all(
-                  color:
-                      AppTheme.gold.withOpacity(0.16),
+            )
+          : RefreshIndicator(
+              onRefresh: _loadReport,
+              color: dark
+                  ? AppTheme.gold
+                  : AppTheme.darkGreen,
+              child:
+                  SingleChildScrollView(
+                physics:
+                    const AlwaysScrollableScrollPhysics(),
+                padding:
+                    const EdgeInsets.fromLTRB(
+                  14,
+                  10,
+                  14,
+                  10,
                 ),
-              ),
-              child: Row(
-                children: [
-                  IconButton(
-                    onPressed:
-                        _loading
-                            ? null
-                            : _previousMonth,
-                    icon: const Icon(
-                      Icons.chevron_left_rounded,
+                child: Column(
+                  children: [
+                    _buildMonthSelector(
+                      Theme.of(context),
+                      dark,
                     ),
-                    color: AppTheme.gold,
-                  ),
-                  Expanded(
-                    child: Column(
+
+                    const SizedBox(height: 16),
+
+                    Container(
+                      width: double.infinity,
+                      padding:
+                          const EdgeInsets.all(8),
+                      decoration:
+                          BoxDecoration(
+                        color:
+                            Colors.grey.shade200,
+                        borderRadius:
+                            BorderRadius.circular(
+                          12,
+                        ),
+                      ),
+                      child: FittedBox(
+                        fit:
+                            BoxFit.fitWidth,
+                        alignment:
+                            Alignment.topCenter,
+                        child: Screenshot(
+                          controller:
+                              _screenshotController,
+                          child:
+                              _buildA4Report(),
+                        ),
+                      ),
+                    ),
+
+                    const SizedBox(height: 18),
+
+                    Row(
                       children: [
-                        Text(
-                          'রিপোর্ট মাস',
-                          style: TextStyle(
-                            color:
-                                AppTheme.textMuted,
-                            fontSize: 10,
+                        Expanded(
+                          child:
+                              ElevatedButton.icon(
+                            onPressed:
+                                _savingImage
+                                    ? null
+                                    : _saveAsImage,
+                            icon: _savingImage
+                                ? const SizedBox(
+                                    width: 18,
+                                    height: 18,
+                                    child:
+                                        CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                    ),
+                                  )
+                                : const Icon(
+                                    Icons
+                                        .image_outlined,
+                                  ),
+                            label:
+                                const Text(
+                              'Save as Image',
+                            ),
+                            style:
+                                ElevatedButton
+                                    .styleFrom(
+                              padding:
+                                  const EdgeInsets
+                                      .symmetric(
+                                vertical: 15,
+                              ),
+                              backgroundColor:
+                                  dark
+                                      ? AppTheme
+                                          .gold
+                                      : AppTheme
+                                          .darkGreen,
+                              foregroundColor:
+                                  dark
+                                      ? Colors.black
+                                      : Colors.white,
+                              shape:
+                                  RoundedRectangleBorder(
+                                borderRadius:
+                                    BorderRadius
+                                        .circular(
+                                  14,
+                                ),
+                              ),
+                            ),
                           ),
                         ),
-                        const SizedBox(height: 2),
-                        Text(
-                          _monthName(),
-                          style: TextStyle(
-                            color:
-                                AppTheme.textPrimary,
-                            fontSize: 15,
-                            fontWeight:
-                                FontWeight.w900,
+
+                        const SizedBox(width: 10),
+
+                        Expanded(
+                          child:
+                              ElevatedButton.icon(
+                            onPressed:
+                                _savingPdf
+                                    ? null
+                                    : _saveAsPdf,
+                            icon: _savingPdf
+                                ? const SizedBox(
+                                    width: 18,
+                                    height: 18,
+                                    child:
+                                        CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                    ),
+                                  )
+                                : const Icon(
+                                    Icons
+                                        .picture_as_pdf_outlined,
+                                  ),
+                            label:
+                                const Text(
+                              'Save as PDF',
+                            ),
+                            style:
+                                ElevatedButton
+                                    .styleFrom(
+                              padding:
+                                  const EdgeInsets
+                                      .symmetric(
+                                vertical: 15,
+                              ),
+                              backgroundColor:
+                                  Colors.redAccent,
+                              foregroundColor:
+                                  Colors.white,
+                              shape:
+                                  RoundedRectangleBorder(
+                                borderRadius:
+                                    BorderRadius
+                                        .circular(
+                                  14,
+                                ),
+                              ),
+                            ),
                           ),
                         ),
                       ],
                     ),
-                  ),
-                  IconButton(
-                    onPressed:
-                        _loading
-                            ? null
-                            : _nextMonth,
-                    icon: const Icon(
-                      Icons.chevron_right_rounded,
+
+                    const SizedBox(height: 6),
+
+                    Text(
+                      'Image: A4 • Gallery-তে Save হবে',
+                      style: TextStyle(
+                        color:
+                            AppTheme.textMuted,
+                        fontSize: 11,
+                      ),
                     ),
-                    color: AppTheme.gold,
-                  ),
-                ],
+
+                    const SizedBox(height: 8),
+                  ],
+                ),
               ),
+            ),
+    );
+  }
+
+  // ============================================================
+  // MONTH SELECTOR
+  // ============================================================
+
+  Widget _buildMonthSelector(
+    ThemeData theme,
+    bool dark,
+  ) {
+    return Container(
+      padding:
+          const EdgeInsets.symmetric(
+        horizontal: 6,
+        vertical: 8,
+      ),
+      decoration:
+          BoxDecoration(
+        color: AppTheme.cardColor,
+        borderRadius:
+            BorderRadius.circular(18),
+        border: Border.all(
+          color: AppTheme.gold.withValues(
+            alpha: dark ? 0.35 : 0.25,
+          ),
+        ),
+      ),
+      child: Row(
+        children: [
+          IconButton(
+            onPressed: _previousMonth,
+            icon: Icon(
+              Icons.chevron_left_rounded,
+              color: dark
+                  ? AppTheme.gold
+                  : AppTheme.darkGreen,
+              size: 30,
             ),
           ),
 
           Expanded(
-            child: _loading
-                ? Center(
-                    child:
-                        CircularProgressIndicator(
-                      color: AppTheme.gold,
-                    ),
-                  )
-                : _errorMessage != null
-                    ? _errorState()
-                    : _transactions.isEmpty
-                        ? SingleChildScrollView(
-                            child: _emptyState(),
-                          )
-                        : SingleChildScrollView(
-                            padding:
-                                const EdgeInsets.only(
-                              bottom: 8,
-                            ),
-                            child: _reportContent(),
-                          ),
-          ),
-
-          if (!_loading &&
-              _errorMessage == null &&
-              _transactions.isNotEmpty)
-            SafeArea(
-              top: false,
+            child: InkWell(
+              borderRadius:
+                  BorderRadius.circular(12),
+              onTap: _selectMonth,
               child: Padding(
                 padding:
-                    const EdgeInsets.fromLTRB(
-                  12,
-                  6,
-                  12,
-                  10,
+                    const EdgeInsets.symmetric(
+                  vertical: 5,
                 ),
-                child: Row(
+                child: Column(
                   children: [
-                    _actionButton(
-                      icon: Icons.image_rounded,
-                      title: 'ছবি',
-                      onTap: _saveAsImage,
-                      loading: _savingImage,
+                    Text(
+                      'রিপোর্টের মাস',
+                      style: TextStyle(
+                        color:
+                            AppTheme.textMuted,
+                        fontSize: 11,
+                        fontWeight:
+                            FontWeight.w600,
+                      ),
                     ),
-                    const SizedBox(width: 10),
-                    _actionButton(
-                      icon:
-                          Icons.picture_as_pdf_rounded,
-                      title: 'PDF',
-                      onTap: _saveAsPdf,
-                      loading: _savingPdf,
+
+                    const SizedBox(height: 3),
+
+                    Text(
+                      DateFormat(
+                        'MMMM yyyy',
+                      ).format(
+                        _selectedMonth,
+                      ),
+                      textAlign:
+                          TextAlign.center,
+                      style: TextStyle(
+                        color:
+                            AppTheme.textPrimary,
+                        fontSize: 18,
+                        fontWeight:
+                            FontWeight.w800,
+                      ),
+                    ),
+
+                    const SizedBox(height: 2),
+
+                    Text(
+                      'মাস পরিবর্তন করতে চাপ দিন',
+                      style: TextStyle(
+                        color:
+                            AppTheme.textMuted,
+                        fontSize: 9,
+                      ),
                     ),
                   ],
                 ),
               ),
             ),
+          ),
+
+          IconButton(
+            onPressed: _nextMonth,
+            icon: Icon(
+              Icons.chevron_right_rounded,
+              color: dark
+                  ? AppTheme.gold
+                  : AppTheme.darkGreen,
+              size: 30,
+            ),
+          ),
         ],
       ),
     );
