@@ -27,7 +27,6 @@ class HomeScreen extends StatelessWidget {
           backgroundColor: AppTheme.background,
           body: Stack(
             children: [
-              // Islamic geometric background
               Positioned.fill(
                 child: CustomPaint(
                   painter: IslamicBackgroundPainter(
@@ -39,9 +38,7 @@ class HomeScreen extends StatelessWidget {
               SafeArea(
                 child: Column(
                   children: [
-                    // ═══════════════════════════════════════
                     // HEADER
-                    // ═══════════════════════════════════════
                     Padding(
                       padding: const EdgeInsets.fromLTRB(
                         14,
@@ -55,7 +52,6 @@ class HomeScreen extends StatelessWidget {
 
                           Column(
                             children: [
-                              // Bismillah
                               Text(
                                 'بِسْمِ اللَّهِ الرَّحْمَنِ الرَّحِيمِ',
                                 textAlign: TextAlign.center,
@@ -70,7 +66,6 @@ class HomeScreen extends StatelessWidget {
 
                               const SizedBox(height: 7),
 
-                              // App name
                               Text(
                                 'সহজ হিসাব গোল্ড',
                                 textAlign: TextAlign.center,
@@ -84,7 +79,6 @@ class HomeScreen extends StatelessWidget {
 
                               const SizedBox(height: 4),
 
-                              // Subtitle
                               Text(
                                 'প্রয়োজনীয় সব হিসাব ও ইউটিলিটি এক জায়গায়',
                                 textAlign: TextAlign.center,
@@ -99,7 +93,7 @@ class HomeScreen extends StatelessWidget {
 
                           const Spacer(),
 
-                          // Theme button
+                          // THEME BUTTON
                           Container(
                             width: 40,
                             height: 40,
@@ -141,9 +135,7 @@ class HomeScreen extends StatelessWidget {
 
                     const SizedBox(height: 12),
 
-                    // ═══════════════════════════════════════
                     // DECORATIVE DIVIDER
-                    // ═══════════════════════════════════════
                     Padding(
                       padding: const EdgeInsets.symmetric(
                         horizontal: 35,
@@ -182,9 +174,7 @@ class HomeScreen extends StatelessWidget {
                       ),
                     ),
 
-                    // ═══════════════════════════════════════
                     // BUTTON GRID
-                    // ═══════════════════════════════════════
                     Expanded(
                       child: Center(
                         child: SingleChildScrollView(
@@ -398,7 +388,6 @@ class HomeScreen extends StatelessWidget {
   }
 }
 
-
 // ═══════════════════════════════════════════════════════════════
 // PREMIUM MENU CARD
 // ═══════════════════════════════════════════════════════════════
@@ -457,9 +446,6 @@ class _MenuCard extends StatelessWidget {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                // ═══════════════════════════════
-                // OUTER ICON CIRCLE
-                // ═══════════════════════════════
                 Container(
                   width: 48,
                   height: 48,
@@ -499,7 +485,6 @@ class _MenuCard extends StatelessWidget {
                         : null,
                   ),
                   child: Center(
-                    // Inner icon box
                     child: Container(
                       width: 34,
                       height: 34,
@@ -539,7 +524,6 @@ class _MenuCard extends StatelessWidget {
 
                 const SizedBox(height: 8),
 
-                // Label
                 Text(
                   title,
                   textAlign: TextAlign.center,
@@ -560,7 +544,6 @@ class _MenuCard extends StatelessWidget {
     );
   }
 }
-
 
 // ═══════════════════════════════════════════════════════════════
 // ISLAMIC GEOMETRIC BACKGROUND
@@ -601,7 +584,6 @@ class IslamicBackgroundPainter extends CustomPainter {
       }
     }
 
-    // Soft central glow
     final glowPaint = Paint()
       ..shader = RadialGradient(
         colors: [
@@ -634,7 +616,6 @@ class IslamicBackgroundPainter extends CustomPainter {
     double radius,
     Paint paint,
   ) {
-    // Outer octagon
     final path = Path();
 
     for (int i = 0; i <= 8; i++) {
@@ -664,7 +645,6 @@ class IslamicBackgroundPainter extends CustomPainter {
       paint,
     );
 
-    // Inner diamond
     final inner = Path();
 
     for (int i = 0; i <= 4; i++) {
@@ -700,7 +680,6 @@ class IslamicBackgroundPainter extends CustomPainter {
       paint,
     );
 
-    // Connecting lines
     for (int i = 0; i < 8; i++) {
       final angle =
           (math.pi * 2 / 8) * i + math.pi / 8;
