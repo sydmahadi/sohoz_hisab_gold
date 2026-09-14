@@ -1,0 +1,72 @@
+name: Build Flutter APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.35.4'
+          channel: stable
+          cache: true
+
+      - name: Flutter version
+        run: flutter --version
+
+      - name: Recreate Android project
+        run: |
+          rm -rf android
+          flutter create --platforms=android --org com.example .
+
+      - name: Configure Android
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+
+          path = Path("android/app/src/main/AndroidManifest.xml")
+          text = path.read_text()
+
+          permission = '<uses-permission android:name="android.permission.INTERNET"/>'
+
+          if 'android.permission.INTERNET' not in text:
+              text = text.replace(
+                  '<manifest xmlns:android="http://schemas.android.com/apk/res/android">',
+                  '<manifest xmlns:android="http://schemas.android.com/apk/res/android">\n\n    ' + permission
+              )
+
+          text = re.sub(
+              r'android:label="[^"]*"',
+              'android:label="সহজ হিসাব প্লাস"',
+              text,
+              count=1
+          )
+
+          path.write_text(text)
+          PY
+
+      - name: Get dependencies
+        run: flutter pub get
+
+      - name: Generate App Icon
+        run: dart run flutter_launcher_icons
+
+      - name: Build APK
+        run: flutter build apk --release
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: sohoz-hisab-plus-apk
+          path: build/app/outputs/flutter-apk/app-release.apk

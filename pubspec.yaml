@@ -1,0 +1,32 @@
+name: sohoz_hisab_plus
+description: "সহজ হিসাব প্লাস - প্রয়োজনীয় সব হিসাব ও ইউটিলিটি এক জায়গায়"
+publish_to: 'none'
+
+version: 1.0.0+2
+
+environment:
+  sdk: ">=3.0.0 <4.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  cupertino_icons: ^1.0.6
+  shared_preferences: ^2.2.3
+  intl: ^0.19.0
+  webview_flutter: ^4.13.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.0
+  flutter_launcher_icons: ^0.14.4
+
+flutter:
+  uses-material-design: true
+
+flutter_launcher_icons:
+  android: "launcher_icon"
+  image_path: "icon.png"
+  adaptive_icon_background: "#06130F"
+  min_sdk_android: 21
