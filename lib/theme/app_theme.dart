@@ -1,4 +1,3 @@
-
 import 'package:flutter/material.dart';
 
 class AppTheme {
@@ -55,6 +54,12 @@ class AppTheme {
   static bool get isDark =>
       themeNotifier.value == ThemeMode.dark;
 
+  // Theme toggle
+  static void toggleTheme() {
+    themeNotifier.value =
+        isDark ? ThemeMode.light : ThemeMode.dark;
+  }
+
   static Color get background =>
       isDark ? backgroundDark : backgroundLight;
 
@@ -74,7 +79,7 @@ class AppTheme {
       isDark ? textDark : textLight;
 
   // ─────────────────────────────────────────────
-  // 1. Dark Theme
+  // Dark Theme
   // ─────────────────────────────────────────────
 
   static ThemeData get darkTheme {
@@ -253,7 +258,7 @@ class AppTheme {
   }
 
   // ─────────────────────────────────────────────
-  // 2. Light Theme
+  // Light Theme
   // ─────────────────────────────────────────────
 
   static ThemeData get lightTheme {
