@@ -39,6 +39,46 @@ class _ReportScreenState extends State<ReportScreen> {
   }
 
   // ============================================================
+  // DATE PARSER
+  // ============================================================
+
+  DateTime? _parseDate(String value) {
+    final text = value.trim();
+
+    if (text.isEmpty) return null;
+
+    // Standard ISO:
+    // 2026-09-14
+    // 2026-09-14T12:30:00
+    final iso = DateTime.tryParse(text);
+    if (iso != null) {
+      return iso;
+    }
+
+    // dd/MM/yyyy
+    try {
+      return DateFormat('dd/MM/yyyy').parseStrict(text);
+    } catch (_) {}
+
+    // dd-MM-yyyy
+    try {
+      return DateFormat('dd-MM-yyyy').parseStrict(text);
+    } catch (_) {}
+
+    // dd.MM.yyyy
+    try {
+      return DateFormat('dd.MM.yyyy').parseStrict(text);
+    } catch (_) {}
+
+    // yyyy/MM/dd
+    try {
+      return DateFormat('yyyy/MM/dd').parseStrict(text);
+    } catch (_) {}
+
+    return null;
+  }
+
+  // ============================================================
   // LOAD TRANSACTIONS
   // ============================================================
 
@@ -57,9 +97,13 @@ class _ReportScreenState extends State<ReportScreen> {
       final List<MoneyTransaction> filtered = [];
 
       for (final transaction in all) {
-        final date = DateTime.tryParse(transaction.date);
+        final date = _parseDate(transaction.date);
 
-        if (date == null) continue;
+        if (date == null) {
+          // Date parse না হলেও transaction বাদ দেব না
+          // যদি current month-এর তথ্য বোঝা সম্ভব না হয়।
+          continue;
+        }
 
         if (date.year == _selectedMonth.year &&
             date.month == _selectedMonth.month) {
@@ -168,10 +212,9 @@ class _ReportScreenState extends State<ReportScreen> {
     return _totalIncome - _totalExpense;
   }
 
-  // Handles Income/income/INCOME etc.
   bool _isType(String value, String expected) {
     return value.trim().toLowerCase() ==
-        expected.toLowerCase();
+        expected.trim().toLowerCase();
   }
 
   // ============================================================
@@ -189,7 +232,7 @@ class _ReportScreenState extends State<ReportScreen> {
       final category =
           transaction.category.trim().isEmpty
               ? 'অন্যান্য'
-              : transaction.category;
+              : transaction.category.trim();
 
       result[category] =
           (result[category] ?? 0) + transaction.amount;
@@ -209,7 +252,7 @@ class _ReportScreenState extends State<ReportScreen> {
       final category =
           transaction.category.trim().isEmpty
               ? 'অন্যান্য'
-              : transaction.category;
+              : transaction.category.trim();
 
       result[category] =
           (result[category] ?? 0) + transaction.amount;
@@ -264,11 +307,23 @@ class _ReportScreenState extends State<ReportScreen> {
           ),
           const SizedBox(height: 7),
           Text(
-            'অন্য মাস দেখতে উপরের মাস পরিবর্তন করুন।',
+            '${_monthName()} মাসের কোনো Income, Expense বা Transfer পাওয়া যায়নি।',
             textAlign: TextAlign.center,
             style: TextStyle(
               color: AppTheme.textMuted,
               fontSize: 12,
+            ),
+          ),
+          const SizedBox(height: 18),
+          OutlinedButton.icon(
+            onPressed: _loadTransactions,
+            icon: const Icon(Icons.refresh_rounded),
+            label: const Text('Refresh'),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: AppTheme.gold,
+              side: BorderSide(
+                color: AppTheme.gold.withOpacity(0.35),
+              ),
             ),
           ),
         ],
@@ -287,7 +342,7 @@ class _ReportScreenState extends State<ReportScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
+            const Icon(
               Icons.error_outline_rounded,
               size: 60,
               color: Colors.redAccent,
@@ -347,7 +402,8 @@ class _ReportScreenState extends State<ReportScreen> {
         ),
       ),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment:
+            CrossAxisAlignment.start,
         children: [
           Row(
             children: [
@@ -481,7 +537,8 @@ class _ReportScreenState extends State<ReportScreen> {
         ),
       ),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment:
+            CrossAxisAlignment.start,
         children: [
           Row(
             children: [
@@ -652,7 +709,6 @@ class _ReportScreenState extends State<ReportScreen> {
           ),
           const SizedBox(height: 16),
 
-          // SUMMARY
           Row(
             children: [
               Expanded(
@@ -681,7 +737,6 @@ class _ReportScreenState extends State<ReportScreen> {
 
           const SizedBox(height: 14),
 
-          // CATEGORIES
           Row(
             crossAxisAlignment:
                 CrossAxisAlignment.start,
@@ -708,7 +763,6 @@ class _ReportScreenState extends State<ReportScreen> {
 
           const SizedBox(height: 12),
 
-          // EXTRA INFO
           Container(
             width: double.infinity,
             padding: const EdgeInsets.all(15),
@@ -798,9 +852,7 @@ class _ReportScreenState extends State<ReportScreen> {
             ),
 
             const SizedBox(height: 22),
-
             const Divider(),
-
             const SizedBox(height: 20),
 
             Row(
@@ -895,44 +947,56 @@ class _ReportScreenState extends State<ReportScreen> {
 
             const SizedBox(height: 28),
 
-            // Footer only in saved image
+            // ==================================================
+            // WATERMARK - BOTTOM RIGHT
+            // ==================================================
+
             Container(
               padding: const EdgeInsets.only(top: 9),
               decoration: const BoxDecoration(
                 border: Border(
                   top: BorderSide(
-                    color: Colors.black26,
+                    color: Color(0xFFE5E5E5),
                   ),
                 ),
               ),
-              child: const Column(
-                crossAxisAlignment:
-                    CrossAxisAlignment.end,
-                children: [
-                  Text(
-                    'সহজ হিসাব',
-                    style: TextStyle(
-                      color: Colors.black54,
-                      fontSize: 9,
-                      fontWeight: FontWeight.w800,
-                    ),
+              child: Align(
+                alignment: Alignment.centerRight,
+                child: SizedBox(
+                  width: 180,
+                  child: Column(
+                    crossAxisAlignment:
+                        CrossAxisAlignment.center,
+                    children: const [
+                      Text(
+                        'সহজ হিসাব',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          color: Color(0xFFBDB7A8),
+                          fontSize: 9,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      SizedBox(height: 2),
+                      Text(
+                        'Sayeed Mahadi',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          color: Color(0xFFC8C3B7),
+                          fontSize: 8,
+                        ),
+                      ),
+                      Text(
+                        'm.talpatarsepai@gmail.com',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          color: Color(0xFFC8C3B7),
+                          fontSize: 8,
+                        ),
+                      ),
+                    ],
                   ),
-                  SizedBox(height: 2),
-                  Text(
-                    'Develop by Sayeed Mahadi',
-                    style: TextStyle(
-                      color: Colors.black45,
-                      fontSize: 8,
-                    ),
-                  ),
-                  Text(
-                    'mahadisayeed@gmail.com',
-                    style: TextStyle(
-                      color: Colors.black45,
-                      fontSize: 8,
-                    ),
-                  ),
-                ],
+                ),
               ),
             ),
           ],
@@ -1228,9 +1292,7 @@ class _ReportScreenState extends State<ReportScreen> {
               ),
 
               pw.SizedBox(height: 18),
-
               pw.Divider(),
-
               pw.SizedBox(height: 15),
 
               pw.Row(
@@ -1254,7 +1316,7 @@ class _ReportScreenState extends State<ReportScreen> {
                   pw.Expanded(
                     child: _pdfSummary(
                       'Balance',
-                      _balance,
+                      _balance.abs(),
                       positive
                           ? PdfColors.green800
                           : PdfColors.red800,
@@ -1322,40 +1384,57 @@ class _ReportScreenState extends State<ReportScreen> {
 
               pw.Spacer(),
 
-              pw.Divider(),
+              pw.Divider(
+                color: PdfColors.grey300,
+              ),
 
               pw.SizedBox(height: 5),
 
+              // ==================================================
+              // PDF WATERMARK - BOTTOM RIGHT
+              // ==================================================
+
               pw.Align(
                 alignment: pw.Alignment.centerRight,
-                child: pw.Column(
-                  crossAxisAlignment:
-                      pw.CrossAxisAlignment.end,
-                  children: [
-                    pw.Text(
-                      'সহজ হিসাব',
-                      style: pw.TextStyle(
-                        fontSize: 9,
-                        fontWeight:
-                            pw.FontWeight.bold,
-                        color: PdfColors.grey700,
+                child: pw.SizedBox(
+                  width: 180,
+                  child: pw.Column(
+                    crossAxisAlignment:
+                        pw.CrossAxisAlignment.center,
+                    children: [
+                      pw.Text(
+                        'সহজ হিসাব',
+                        textAlign:
+                            pw.TextAlign.center,
+                        style: pw.TextStyle(
+                          fontSize: 9,
+                          fontWeight:
+                              pw.FontWeight.bold,
+                          color: PdfColors.grey500,
+                        ),
                       ),
-                    ),
-                    pw.Text(
-                      'Develop by Sayeed Mahadi',
-                      style: const pw.TextStyle(
-                        fontSize: 8,
-                        color: PdfColors.grey600,
+                      pw.Text(
+                        'Sayeed Mahadi',
+                        textAlign:
+                            pw.TextAlign.center,
+                        style: const pw.TextStyle(
+                          fontSize: 8,
+                          color:
+                              PdfColors.grey500,
+                        ),
                       ),
-                    ),
-                    pw.Text(
-                      'mahadisayeed@gmail.com',
-                      style: const pw.TextStyle(
-                        fontSize: 8,
-                        color: PdfColors.grey600,
+                      pw.Text(
+                        'm.talpatarsepai@gmail.com',
+                        textAlign:
+                            pw.TextAlign.center,
+                        style: const pw.TextStyle(
+                          fontSize: 8,
+                          color:
+                              PdfColors.grey500,
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
             ],
@@ -1617,10 +1696,6 @@ class _ReportScreenState extends State<ReportScreen> {
 
       body: Column(
         children: [
-          // ====================================================
-          // MONTH SELECTOR
-          // ====================================================
-
           Padding(
             padding: const EdgeInsets.fromLTRB(
               14,
@@ -1654,7 +1729,6 @@ class _ReportScreenState extends State<ReportScreen> {
                     ),
                     color: AppTheme.gold,
                   ),
-
                   Expanded(
                     child: Column(
                       children: [
@@ -1680,7 +1754,6 @@ class _ReportScreenState extends State<ReportScreen> {
                       ],
                     ),
                   ),
-
                   IconButton(
                     onPressed:
                         _loading
@@ -1695,10 +1768,6 @@ class _ReportScreenState extends State<ReportScreen> {
               ),
             ),
           ),
-
-          // ====================================================
-          // BODY
-          // ====================================================
 
           Expanded(
             child: _loading
@@ -1722,10 +1791,6 @@ class _ReportScreenState extends State<ReportScreen> {
                             child: _reportContent(),
                           ),
           ),
-
-          // ====================================================
-          // SAVE BUTTONS
-          // ====================================================
 
           if (!_loading &&
               _errorMessage == null &&
