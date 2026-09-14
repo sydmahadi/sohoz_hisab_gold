@@ -1,3 +1,4 @@
+
 import 'package:flutter/material.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 
@@ -14,7 +15,9 @@ class _BrowserScreenState extends State<BrowserScreen> {
   late final WebViewController _controller;
 
   final TextEditingController _urlController =
-      TextEditingController(text: 'https://www.google.com/');
+      TextEditingController(
+    text: 'https://www.google.com/',
+  );
 
   bool _isLoading = true;
   int _progress = 0;
@@ -24,7 +27,9 @@ class _BrowserScreenState extends State<BrowserScreen> {
     super.initState();
 
     _controller = WebViewController()
-      ..setJavaScriptMode(JavaScriptMode.unrestricted)
+      ..setJavaScriptMode(
+        JavaScriptMode.unrestricted,
+      )
       ..setNavigationDelegate(
         NavigationDelegate(
           onPageStarted: (_) {
@@ -81,8 +86,14 @@ class _BrowserScreenState extends State<BrowserScreen> {
 
     if (uri == null || uri.host.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('সঠিক ওয়েব ঠিকানা লিখুন'),
+        SnackBar(
+          backgroundColor: AppTheme.cardColor,
+          content: Text(
+            'সঠিক ওয়েব ঠিকানা লিখুন',
+            style: TextStyle(
+              color: AppTheme.textPrimary,
+            ),
+          ),
         ),
       );
       return;
@@ -121,6 +132,7 @@ class _BrowserScreenState extends State<BrowserScreen> {
       },
       child: Scaffold(
         backgroundColor: AppTheme.background,
+
         appBar: AppBar(
           title: const Text('ব্রাউজার'),
           actions: [
@@ -135,6 +147,7 @@ class _BrowserScreenState extends State<BrowserScreen> {
             ),
           ],
         ),
+
         body: Column(
           children: [
             Container(
@@ -145,6 +158,7 @@ class _BrowserScreenState extends State<BrowserScreen> {
                 8,
               ),
               color: AppTheme.backgroundSecondary,
+
               child: Row(
                 children: [
                   IconButton(
@@ -154,11 +168,12 @@ class _BrowserScreenState extends State<BrowserScreen> {
                       }
                     },
                     tooltip: 'পেছনে',
-                    icon: const Icon(
+                    icon: Icon(
                       Icons.arrow_back_rounded,
                       color: AppTheme.goldLight,
                     ),
                   ),
+
                   IconButton(
                     onPressed: () async {
                       if (await _controller.canGoForward()) {
@@ -166,32 +181,38 @@ class _BrowserScreenState extends State<BrowserScreen> {
                       }
                     },
                     tooltip: 'সামনে',
-                    icon: const Icon(
+                    icon: Icon(
                       Icons.arrow_forward_rounded,
                       color: AppTheme.goldLight,
                     ),
                   ),
+
                   Expanded(
                     child: TextField(
                       controller: _urlController,
                       keyboardType: TextInputType.url,
                       textInputAction: TextInputAction.go,
+
                       onSubmitted: (_) {
                         _openUrl();
                       },
-                      decoration: const InputDecoration(
+
+                      decoration: InputDecoration(
                         hintText: 'ওয়েব ঠিকানা লিখুন',
-                        prefixIcon: Icon(
+                        prefixIcon: const Icon(
                           Icons.language_rounded,
                         ),
-                        contentPadding: EdgeInsets.symmetric(
+                        contentPadding:
+                            const EdgeInsets.symmetric(
                           horizontal: 12,
                           vertical: 12,
                         ),
                       ),
                     ),
                   ),
+
                   const SizedBox(width: 8),
+
                   IconButton(
                     onPressed: _openUrl,
                     tooltip: 'যান',
