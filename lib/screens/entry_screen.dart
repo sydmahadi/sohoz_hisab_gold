@@ -12,6 +12,7 @@ class EntryScreen extends StatefulWidget {
 
 class _EntryScreenState extends State<EntryScreen> {
   late final WebViewController _controller;
+
   bool _isLoading = true;
 
   @override
@@ -19,7 +20,9 @@ class _EntryScreenState extends State<EntryScreen> {
     super.initState();
 
     _controller = WebViewController()
-      ..setJavaScriptMode(JavaScriptMode.unrestricted)
+      ..setJavaScriptMode(
+        JavaScriptMode.unrestricted,
+      )
       ..setNavigationDelegate(
         NavigationDelegate(
           onPageStarted: (_) {
@@ -56,20 +59,20 @@ class _EntryScreenState extends State<EntryScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppTheme.background,
-
       appBar: AppBar(
         title: const Text('এন্ট্রি করুন'),
         actions: [
           IconButton(
-            icon: const Icon(Icons.refresh_rounded),
-            tooltip: 'রিফ্রেশ',
             onPressed: () {
               _controller.reload();
             },
+            tooltip: 'রিফ্রেশ',
+            icon: const Icon(
+              Icons.refresh_rounded,
+            ),
           ),
         ],
       ),
-
       body: Stack(
         children: [
           WebViewWidget(
@@ -78,7 +81,9 @@ class _EntryScreenState extends State<EntryScreen> {
 
           if (_isLoading)
             Container(
-              color: AppTheme.background.withOpacity(0.75),
+              color: AppTheme.background.withValues(
+                alpha: 0.75,
+              ),
               child: const Center(
                 child: CircularProgressIndicator(
                   color: AppTheme.gold,
