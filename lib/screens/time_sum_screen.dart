@@ -1,107 +1,62 @@
 import 'package:flutter/material.dart';
 
+import '../logic/calculator_logic.dart';
+import '../models/calculator_model.dart';
 import '../theme/app_theme.dart';
 
-class TimeSumScreen extends StatefulWidget {
-  const TimeSumScreen({super.key});
+class MonthlyAverageScreen extends StatefulWidget {
+  const MonthlyAverageScreen({super.key});
 
   @override
-  State<TimeSumScreen> createState() => _TimeSumScreenState();
+  State<MonthlyAverageScreen> createState() => _MonthlyAverageScreenState();
 }
 
-class _TimeSumScreenState extends State<TimeSumScreen> {
-  final List<TextEditingController> _controllers = [
-    TextEditingController(),
-    TextEditingController(),
-  ];
+class _MonthlyAverageScreenState extends State<MonthlyAverageScreen> {
+  final TextEditingController _daysController = TextEditingController();
+  final TextEditingController _valueController = TextEditingController();
 
+  AverageType _type = AverageType.count;
   String? _result;
 
-  void _addField() {
-    setState(() {
-      _controllers.add(TextEditingController());
-    });
-  }
+  void _calculate() {
+    final days = double.tryParse(_daysController.text.trim());
 
-  void _removeField(int index) {
-    if (_controllers.length <= 2) {
+    if (days == null || days <= 0) {
+      setState(() {
+        _result = 'সঠিক দিন ইনপুট দিন';
+      });
       return;
     }
 
-    _controllers[index].dispose();
+    if (_type == AverageType.count) {
+      final value = double.tryParse(_valueController.text.trim());
 
-    setState(() {
-      _controllers.removeAt(index);
-    });
-  }
-
-  int? _parseTime(String value) {
-    final text = value.trim();
-
-    if (text.isEmpty) {
-      return 0;
-    }
-
-    final parts = text.split('.');
-
-    if (parts.length != 2) {
-      return null;
-    }
-
-    final hours = int.tryParse(parts[0]);
-    final minutes = int.tryParse(parts[1]);
-
-    if (hours == null || minutes == null) {
-      return null;
-    }
-
-    if (hours < 0 || minutes < 0 || minutes > 59) {
-      return null;
-    }
-
-    return (hours * 60) + minutes;
-  }
-
-  void _calculate() {
-    int totalMinutes = 0;
-
-    for (final controller in _controllers) {
-      final minutes = _parseTime(controller.text);
-
-      if (minutes == null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(
-              'সময় সঠিকভাবে লিখুন। উদাহরণ: 2.30',
-            ),
-          ),
-        );
+      if (value == null || value < 0) {
+        setState(() {
+          _result = 'সঠিক সংখ্যা ইনপুট দিন';
+        });
         return;
       }
 
-      totalMinutes += minutes;
+      setState(() {
+        _result = CalculatorLogic.monthlyCount(
+          days: days,
+          value: value,
+        );
+      });
+    } else {
+      setState(() {
+        _result = CalculatorLogic.monthlyTime(
+          days: days,
+          time: _valueController.text,
+        );
+      });
     }
-
-    final hours = totalMinutes ~/ 60;
-    final minutes = totalMinutes % 60;
-
-    setState(() {
-      if (hours == 0 && minutes == 0) {
-        _result = '০ ঘণ্টা ০ মিনিট';
-      } else if (hours == 0) {
-        _result = '$minutes মিনিট';
-      } else if (minutes == 0) {
-        _result = '$hours ঘণ্টা';
-      } else {
-        _result = '$hours ঘণ্টা $minutes মিনিট';
-      }
-    });
   }
 
-  void _clearAll() {
-    for (final controller in _controllers) {
-      controller.clear();
-    }
+  void _clear() {
+    _daysController.clear();
+    _valueController.clear();
 
     setState(() {
       _result = null;
@@ -110,23 +65,23 @@ class _TimeSumScreenState extends State<TimeSumScreen> {
 
   @override
   void dispose() {
-    for (final controller in _controllers) {
-      controller.dispose();
-    }
-
+    _daysController.dispose();
+    _valueController.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
+    final bool isTime = _type == AverageType.time;
+
     return Scaffold(
       backgroundColor: AppTheme.background,
       appBar: AppBar(
-        title: const Text('সময় যোগ'),
+        title: const Text('মাসিক গড়'),
         actions: [
           IconButton(
-            onPressed: _clearAll,
-            tooltip: 'সব মুছে ফেলুন',
+            onPressed: _clear,
+            tooltip: 'মুছে ফেলুন',
             icon: const Icon(Icons.refresh_rounded),
           ),
         ],
@@ -142,35 +97,26 @@ class _TimeSumScreenState extends State<TimeSumScreen> {
                 child: Column(
                   children: [
                     const Icon(
-                      Icons.access_time_rounded,
+                      Icons.calendar_view_month_rounded,
                       color: AppTheme.gold,
                       size: 46,
                     ),
                     const SizedBox(height: 12),
-                    const Text(
-                      'সময় যোগ করুন',
+                    Text(
+                      'মাসিক গড় হিসাব',
                       style: TextStyle(
-                        color: AppTheme.textDark,
+                        color: AppTheme.textPrimary,
                         fontSize: 20,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
                     const SizedBox(height: 8),
-                    const Text(
-                      'সময় লিখুন ঘণ্টা.মিনিট ফরম্যাটে',
+                    Text(
+                      'আপনার দেওয়া দিনের হিসাব থেকে ৩০ দিনের মাসিক গড় বের করুন',
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         color: AppTheme.textMuted,
                         fontSize: 14,
-                      ),
-                    ),
-                    const SizedBox(height: 5),
-                    const Text(
-                      'উদাহরণ: 2.30 = ২ ঘণ্টা ৩০ মিনিট',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        color: AppTheme.goldLight,
-                        fontSize: 13,
                       ),
                     ),
                   ],
@@ -186,70 +132,106 @@ class _TimeSumScreenState extends State<TimeSumScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    ...List.generate(
-                      _controllers.length,
-                      (index) {
-                        return Padding(
-                          padding: const EdgeInsets.only(bottom: 12),
-                          child: Row(
-                            children: [
-                              Expanded(
-                                child: TextField(
-                                  controller: _controllers[index],
-                                  keyboardType:
-                                      const TextInputType.numberWithOptions(
-                                    decimal: true,
-                                  ),
-                                  decoration: InputDecoration(
-                                    labelText: 'সময় ${index + 1}',
-                                    hintText: 'যেমন: 2.30',
-                                    prefixIcon: const Icon(
-                                      Icons.schedule_rounded,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                              if (_controllers.length > 2) ...[
-                                const SizedBox(width: 8),
-                                IconButton(
-                                  onPressed: () => _removeField(index),
-                                  tooltip: 'মুছে ফেলুন',
-                                  style: IconButton.styleFrom(
-                                    foregroundColor: AppTheme.gold,
-                                  ),
-                                  icon: const Icon(
-                                    Icons.remove_circle_outline_rounded,
-                                  ),
-                                ),
-                              ],
-                            ],
-                          ),
-                        );
-                      },
+                    Text(
+                      'হিসাবের ধরন',
+                      style: TextStyle(
+                        color: AppTheme.goldLight,
+                        fontSize: 15,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
 
-                    const SizedBox(height: 4),
+                    const SizedBox(height: 10),
 
-                    OutlinedButton.icon(
-                      onPressed: _addField,
-                      icon: const Icon(Icons.add_rounded),
-                      label: const Text('আরও সময় যোগ করুন'),
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: AppTheme.goldLight,
-                        side: const BorderSide(
-                          color: AppTheme.gold,
+                    SegmentedButton<AverageType>(
+                      segments: const [
+                        ButtonSegment<AverageType>(
+                          value: AverageType.count,
+                          icon: Icon(Icons.numbers_rounded),
+                          label: Text('সংখ্যা'),
                         ),
-                        minimumSize: const Size(
-                          double.infinity,
-                          50,
+                        ButtonSegment<AverageType>(
+                          value: AverageType.time,
+                          icon: Icon(Icons.access_time_rounded),
+                          label: Text('সময়'),
                         ),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(17),
+                      ],
+                      selected: {_type},
+                      onSelectionChanged: (selection) {
+                        setState(() {
+                          _type = selection.first;
+                          _result = null;
+                          _valueController.clear();
+                        });
+                      },
+                      style: ButtonStyle(
+                        foregroundColor:
+                            WidgetStateProperty.resolveWith<Color?>(
+                          (states) {
+                            if (states.contains(WidgetState.selected)) {
+                              return Colors.black;
+                            }
+                            return AppTheme.textPrimary;
+                          },
+                        ),
+                        backgroundColor:
+                            WidgetStateProperty.resolveWith<Color?>(
+                          (states) {
+                            if (states.contains(WidgetState.selected)) {
+                              return AppTheme.gold;
+                            }
+                            return AppTheme.cardLight;
+                          },
                         ),
                       ),
                     ),
 
-                    const SizedBox(height: 14),
+                    const SizedBox(height: 18),
+
+                    TextField(
+                      controller: _daysController,
+                      keyboardType: const TextInputType.numberWithOptions(
+                        decimal: true,
+                      ),
+                      decoration: const InputDecoration(
+                        labelText: 'মোট দিন',
+                        hintText: 'যেমন: 15',
+                        prefixIcon: Icon(
+                          Icons.calendar_today_rounded,
+                        ),
+                      ),
+                    ),
+
+                    const SizedBox(height: 15),
+
+                    TextField(
+                      controller: _valueController,
+                      keyboardType: const TextInputType.numberWithOptions(
+                        decimal: true,
+                      ),
+                      decoration: InputDecoration(
+                        labelText: isTime ? 'মোট সময়' : 'মোট সংখ্যা',
+                        hintText: isTime ? 'যেমন: 45.30' : 'যেমন: 150',
+                        prefixIcon: Icon(
+                          isTime
+                              ? Icons.schedule_rounded
+                              : Icons.numbers_rounded,
+                        ),
+                      ),
+                    ),
+
+                    if (isTime) ...[
+                      const SizedBox(height: 8),
+                      Text(
+                        'সময় ঘণ্টা.মিনিট ফরম্যাটে লিখুন। যেমন: 45.30',
+                        style: TextStyle(
+                          color: AppTheme.textMuted,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+
+                    const SizedBox(height: 18),
 
                     ElevatedButton.icon(
                       onPressed: _calculate,
@@ -263,6 +245,7 @@ class _TimeSumScreenState extends State<TimeSumScreen> {
 
             if (_result != null) ...[
               const SizedBox(height: 18),
+
               Card(
                 child: Padding(
                   padding: const EdgeInsets.all(22),
@@ -274,8 +257,8 @@ class _TimeSumScreenState extends State<TimeSumScreen> {
                         size: 46,
                       ),
                       const SizedBox(height: 10),
-                      const Text(
-                        'মোট সময়',
+                      Text(
+                        'মাসিক গড়',
                         style: TextStyle(
                           color: AppTheme.textMuted,
                           fontSize: 15,
@@ -285,10 +268,18 @@ class _TimeSumScreenState extends State<TimeSumScreen> {
                       Text(
                         _result!,
                         textAlign: TextAlign.center,
-                        style: const TextStyle(
+                        style: TextStyle(
                           color: AppTheme.goldLight,
                           fontSize: 25,
                           fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        '৩০ দিনের ভিত্তিতে',
+                        style: TextStyle(
+                          color: AppTheme.textMuted,
+                          fontSize: 13,
                         ),
                       ),
                     ],
