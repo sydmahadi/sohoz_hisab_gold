@@ -84,25 +84,43 @@ class HomeScreen extends StatelessWidget {
       appBar: AppBar(
         title: const Text('সহজ হিসাব গোল্ড'),
         actions: [
-          // ─── থিম চেঞ্জ বাটন (কর্নরে) ───
+          // ─── দৃশ্যমান থিম চেঞ্জ বাটন (ডান কর্নারে) ───
           ValueListenableBuilder<ThemeMode>(
             valueListenable: AppTheme.themeNotifier,
             builder: (_, ThemeMode mode, __) {
               final isDark = mode == ThemeMode.dark;
-              return IconButton(
-                icon: Icon(
-                  isDark ? Icons.light_mode_rounded : Icons.dark_mode_rounded,
-                  color: isDark ? AppTheme.gold : AppTheme.darkGreen,
+              return Padding(
+                padding: const EdgeInsets.only(right: 8.0),
+                child: Container(
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: isDark
+                        ? AppTheme.gold.withValues(alpha: 0.15)
+                        : AppTheme.darkGreen.withValues(alpha: 0.1),
+                    border: Border.all(
+                      color: isDark
+                          ? AppTheme.gold.withValues(alpha: 0.5)
+                          : AppTheme.darkGreen.withValues(alpha: 0.3),
+                      width: 1,
+                    ),
+                  ),
+                  child: IconButton(
+                    icon: Icon(
+                      isDark ? Icons.light_mode_rounded : Icons.dark_mode_rounded,
+                      color: isDark ? AppTheme.gold : AppTheme.darkGreen,
+                      size: 22,
+                    ),
+                    tooltip: isDark ? 'Light Mode' : 'Dark Mode',
+                    onPressed: () {
+                      AppTheme.themeNotifier.value =
+                          isDark ? ThemeMode.light : ThemeMode.dark;
+                    },
+                  ),
                 ),
-                tooltip: 'থিম পরিবর্তন করুন',
-                onPressed: () {
-                  AppTheme.themeNotifier.value =
-                      isDark ? ThemeMode.light : ThemeMode.dark;
-                },
               );
             },
           ),
-          const SizedBox(width: 8),
+          const SizedBox(width: 6),
         ],
       ),
       body: Stack(
