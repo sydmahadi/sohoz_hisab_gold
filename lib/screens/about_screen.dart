@@ -94,7 +94,7 @@ class AboutScreen extends StatelessWidget {
                   const SizedBox(height: 8),
 
                   Text(
-                    'সহজ হিসাব গোল্ড',
+                    'সহজ হিসাব',
                     style: TextStyle(
                       color: AppTheme.textPrimary,
                       fontSize: 25,
@@ -345,8 +345,8 @@ class AboutScreen extends StatelessWidget {
               icon: Icons.calendar_month_outlined,
               title: 'ক্যালেন্ডার',
               child: Text(
-                'ক্যালেন্ডারের মাধ্যমে বিভিন্ন তারিখ দেখা এবং প্রয়োজনীয় '
-                'তারিখ নির্বাচন করা যাবে।',
+                'ক্যালেন্ডারের মাধ্যমে হিজরি,বাংলা ও ইংরেজী তারিখ দেখা এবং প্রয়োজনীয় '
+                'তারিখ নির্বাচন করা যাবে। ইভেন্ট শিডিউল করে রাখা যাবে।',
                 style: TextStyle(
                   color: AppTheme.textMuted,
                   fontSize: 14,
