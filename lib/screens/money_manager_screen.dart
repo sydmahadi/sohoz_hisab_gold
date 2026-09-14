@@ -19,7 +19,7 @@ class _MoneyManagerScreenState extends State<MoneyManagerScreen> {
 
   List<MoneyTransaction> _transactions = [];
 
-  // আপনার দেওয়া আপডেট করা Expense ক্যাটাগরি তালিকা
+  // Expense (খরচ) ক্যাটাগরি তালিকা
   List<String> _expenseCategories = [
     'উর্ধ্বতন এয়ানত',
     'যাতায়াত',
@@ -46,12 +46,24 @@ class _MoneyManagerScreenState extends State<MoneyManagerScreen> {
     'ফাউন্ডেশন',
   ];
 
-  // Income ক্যাটাগরি (পরবর্তীতে আপনার তালিকা অনুযায়ী আপডেট করা হবে)
+  // আপনার দেওয়া আপডেট করা Income (আয়) ক্যাটাগরি তালিকা
   List<String> _incomeCategories = [
-    'এয়ানত',
-    'দান',
-    'বাজেট',
-    'অন্যান্য',
+    'জনশক্তি',
+    'শুভাকাঙ্খী এয়ানত',
+    'শাখা এয়ানত',
+    'এককালীন',
+    'বিশেষ',
+    'সফর',
+    'প্রকাশনা মুনাফা',
+    'সাহিত্য মুনাফা',
+    'ছাত্রকল্যাণ',
+    'প্রোগ্রাম বাস্তবায়ন',
+    'ঋণ গ্রহণ',
+    'সদস্য সম্মেলন',
+    'ঋন ফেরত',
+    'শহীদ ফান্ড',
+    'জাকাত',
+    'এ + সংবর্ধনা',
   ];
 
   List<String> _accounts = ['Cash', 'Bkash', 'Bank Account', 'Nagad', 'Card'];
@@ -81,7 +93,14 @@ class _MoneyManagerScreenState extends State<MoneyManagerScreen> {
     return Scaffold(
       backgroundColor: AppTheme.background,
       appBar: AppBar(
-        title: const Text('মানি ম্যানেজার'),
+        title: const Text(
+          'সহজ হিসাব',
+          style: TextStyle(
+            color: AppTheme.gold,
+            fontWeight: FontWeight.bold,
+            fontSize: 20,
+          ),
+        ),
         actions: [
           IconButton(
             icon: const Icon(Icons.cloud_upload_rounded, color: AppTheme.gold),
@@ -105,8 +124,8 @@ class _MoneyManagerScreenState extends State<MoneyManagerScreen> {
       body: pages[_currentIndex],
       floatingActionButton: _currentIndex == 0
           ? FloatingActionButton(
-              backgroundColor: Colors.redAccent,
-              child: const Icon(Icons.add, color: Colors.white, size: 30),
+              backgroundColor: AppTheme.gold,
+              child: const Icon(Icons.add, color: Colors.black, size: 30),
               onPressed: () => _showAddTransactionModal(context),
             )
           : null,
