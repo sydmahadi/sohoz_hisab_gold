@@ -4,17 +4,21 @@ import 'package:intl/intl.dart';
 
 import '../theme/app_theme.dart';
 import '../logic/money_db_helper.dart';
+import 'report_screen.dart';
 
 class MoneyManagerScreen extends StatefulWidget {
   const MoneyManagerScreen({super.key});
 
   @override
-  State<MoneyManagerScreen> createState() => _MoneyManagerScreenState();
+  State<MoneyManagerScreen> createState() =>
+      _MoneyManagerScreenState();
 }
 
-class _MoneyManagerScreenState extends State<MoneyManagerScreen> {
+class _MoneyManagerScreenState
+    extends State<MoneyManagerScreen> {
   int _currentIndex = 0;
   int _statsTab = 1;
+
   DateTime _selectedDate = DateTime.now();
   String _filterType = 'Monthly';
 
@@ -80,7 +84,8 @@ class _MoneyManagerScreenState extends State<MoneyManagerScreen> {
   }
 
   Future<void> _loadData() async {
-    final data = await MoneyDbHelper.instance.getAllTransactions();
+    final data =
+        await MoneyDbHelper.instance.getAllTransactions();
 
     if (!mounted) return;
 
@@ -97,19 +102,109 @@ class _MoneyManagerScreenState extends State<MoneyManagerScreen> {
     }
   }
 
-  double _calculateAccountBalance(String accountName) {
-    double balance = 0.0;
+  List<MoneyTransaction> get _filteredTransactions {
+    return _transactions.where((transaction) {
+      final date = _parseDate(transaction.date);
 
-    for (final item in _transactions) {
-      if (item.type == 'Income' && item.account == accountName) {
-        balance += item.amount;
-      } else if (item.type == 'Expense' && item.account == accountName) {
-        balance -= item.amount;
-      } else if (item.type == 'Transfer') {
-        if (item.account.startsWith('$accountName ➔')) {
-          balance -= item.amount;
-        } else if (item.account.endsWith('➔ $accountName')) {
-          balance += item.amount;
+      if (date == null) return false;
+
+      if (_filterType == 'Daily') {
+        return date.year == _selectedDate.year &&
+            date.month == _selectedDate.month &&
+            date.day == _selectedDate.day;
+      }
+
+      if (_filterType == 'Weekly') {
+        final start = _selectedDate.subtract(
+          Duration(days: _selectedDate.weekday - 1),
+        );
+
+        final end = start.add(
+          const Duration(days: 6),
+        );
+
+        final d = DateTime(
+          date.year,
+          date.month,
+          date.day,
+        );
+
+        final s = DateTime(
+          start.year,
+          start.month,
+          start.day,
+        );
+
+        final e = DateTime(
+          end.year,
+          end.month,
+          end.day,
+        );
+
+        return !d.isBefore(s) && !d.isAfter(e);
+      }
+
+      if (_filterType == 'Yearly') {
+        return date.year == _selectedDate.year;
+      }
+
+      return date.year == _selectedDate.year &&
+          date.month == _selectedDate.month;
+    }).toList();
+  }
+
+  double get _totalIncome {
+    return _filteredTransactions
+        .where((e) => e.type == 'Income')
+        .fold<double>(
+          0,
+          (sum, item) => sum + item.amount,
+        );
+  }
+
+  double get _totalExpense {
+    return _filteredTransactions
+        .where((e) => e.type == 'Expense')
+        .fold<double>(
+          0,
+          (sum, item) => sum + item.amount,
+        );
+  }
+
+  double get _balance {
+    return _totalIncome - _totalExpense;
+  }
+
+  double _accountBalance(String accountName) {
+    double balance = 0;
+
+    for (final transaction in _transactions) {
+      if (transaction.type == 'Income') {
+        if (transaction.account == accountName) {
+          balance += transaction.amount;
+        }
+      } else if (transaction.type == 'Expense') {
+        if (transaction.account == accountName) {
+          balance -= transaction.amount;
+        }
+      } else if (transaction.type == 'Transfer') {
+        final account = transaction.account;
+
+        if (account.contains('➔')) {
+          final parts = account.split('➔');
+
+          if (parts.length == 2) {
+            final from = parts[0].trim();
+            final to = parts[1].trim();
+
+            if (from == accountName) {
+              balance -= transaction.amount;
+            }
+
+            if (to == accountName) {
+              balance += transaction.amount;
+            }
+          }
         }
       }
     }
@@ -117,119 +212,64 @@ class _MoneyManagerScreenState extends State<MoneyManagerScreen> {
     return balance;
   }
 
-  List<MoneyTransaction> _getFilteredTransactions() {
-    return _transactions.where((item) {
-      final itemDate = _parseDate(item.date);
+  Future<void> _openReport() async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => const ReportScreen(),
+      ),
+    );
 
-      if (itemDate == null) {
-        return false;
-      }
-
-      if (_filterType == 'Monthly') {
-        return itemDate.year == _selectedDate.year &&
-            itemDate.month == _selectedDate.month;
-      }
-
-      if (_filterType == 'Yearly') {
-        return itemDate.year == _selectedDate.year;
-      }
-
-      if (_filterType == 'Daily') {
-        return itemDate.year == _selectedDate.year &&
-            itemDate.month == _selectedDate.month &&
-            itemDate.day == _selectedDate.day;
-      }
-
-      if (_filterType == 'Weekly') {
-        final startOfWeek = _selectedDate.subtract(
-          Duration(days: _selectedDate.weekday - 1),
-        );
-
-        final endOfWeek = startOfWeek.add(
-          const Duration(days: 6),
-        );
-
-        return itemDate.isAfter(
-              startOfWeek.subtract(const Duration(days: 1)),
-            ) &&
-            itemDate.isBefore(
-              endOfWeek.add(const Duration(days: 1)),
-            );
-      }
-
-      return true;
-    }).toList();
+    await _loadData();
   }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
+    final isDark = AppTheme.isDark;
 
     final pages = [
       _buildTransView(theme, isDark),
       _buildStatsView(theme, isDark),
       _buildAccountsView(theme, isDark),
-      _buildMoreView(theme, isDark),
+      _buildReportView(theme, isDark),
     ];
 
     return Scaffold(
-      backgroundColor: theme.scaffoldBackgroundColor,
+      backgroundColor: AppTheme.background,
+
       appBar: AppBar(
         title: Text(
-          'সহজ হিসাব',
+          'মানি ম্যানেজার',
           style: TextStyle(
             color: isDark
                 ? AppTheme.gold
-                : theme.textTheme.titleLarge?.color,
-            fontWeight: FontWeight.bold,
-            fontSize: 20,
+                : AppTheme.darkGreen,
+            fontWeight: FontWeight.w800,
           ),
         ),
-        actions: [
-          IconButton(
-            tooltip: 'Google Drive',
-            icon: Icon(
-              Icons.cloud_upload_rounded,
-              color: isDark ? AppTheme.gold : AppTheme.darkGreen,
-            ),
-            onPressed: () async {
-              final success = await MoneyDbHelper.signInWithGoogle();
-
-              if (!mounted) return;
-
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text(
-                    success
-                        ? 'গুগল ড্রাইভ কানেক্ট সম্পন্ন হয়েছে!'
-                        : 'সাইন-ইন করতে সমস্যা হয়েছে',
-                  ),
-                ),
-              );
-            },
-          ),
-        ],
       ),
-      body: pages[_currentIndex],
+
+      body: IndexedStack(
+        index: _currentIndex,
+        children: pages,
+      ),
+
       floatingActionButton: _currentIndex == 0
           ? FloatingActionButton(
-              backgroundColor:
-                  isDark ? AppTheme.gold : AppTheme.darkGreen,
-              onPressed: () {
-                _showAddTransactionModal(
-                  context,
-                  theme,
-                  isDark,
-                );
-              },
+              backgroundColor: isDark
+                  ? AppTheme.gold
+                  : AppTheme.darkGreen,
+              foregroundColor: isDark
+                  ? Colors.black
+                  : Colors.white,
+              onPressed: _showAddTransaction,
               child: const Icon(
-                Icons.add,
-                color: Colors.white,
-                size: 30,
+                Icons.add_rounded,
               ),
             )
           : null,
+
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _currentIndex,
         onTap: (index) {
@@ -237,29 +277,36 @@ class _MoneyManagerScreenState extends State<MoneyManagerScreen> {
             _currentIndex = index;
           });
         },
-        selectedItemColor:
-            isDark ? AppTheme.gold : AppTheme.darkGreen,
-        unselectedItemColor:
-            isDark ? Colors.grey : Colors.black45,
-        backgroundColor:
-            theme.cardTheme.color ?? AppTheme.cardColor,
         type: BottomNavigationBarType.fixed,
+        backgroundColor: AppTheme.cardColor,
+        selectedItemColor: isDark
+            ? AppTheme.gold
+            : AppTheme.darkGreen,
+        unselectedItemColor: AppTheme.textMuted,
         items: const [
           BottomNavigationBarItem(
             icon: Icon(Icons.book_outlined),
+            activeIcon: Icon(Icons.book_rounded),
             label: 'Trans.',
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.bar_chart_rounded),
+            icon: Icon(Icons.bar_chart_outlined),
+            activeIcon: Icon(Icons.bar_chart_rounded),
             label: 'Stats',
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.account_balance_wallet_outlined),
+            icon: Icon(
+              Icons.account_balance_wallet_outlined,
+            ),
+            activeIcon: Icon(
+              Icons.account_balance_wallet_rounded,
+            ),
             label: 'Accounts',
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.more_horiz_rounded),
-            label: 'More',
+            icon: Icon(Icons.assessment_outlined),
+            activeIcon: Icon(Icons.assessment_rounded),
+            label: 'Report',
           ),
         ],
       ),
@@ -267,259 +314,404 @@ class _MoneyManagerScreenState extends State<MoneyManagerScreen> {
   }
 
   // ============================================================
-  // TRANSACTIONS
+  // TRANSACTION VIEW
   // ============================================================
 
   Widget _buildTransView(
     ThemeData theme,
     bool isDark,
   ) {
-    final totalIncome = _transactions
-        .where((e) => e.type == 'Income')
-        .fold<double>(
-          0,
-          (sum, item) => sum + item.amount,
-        );
+    return RefreshIndicator(
+      onRefresh: _loadData,
+      color: isDark
+          ? AppTheme.gold
+          : AppTheme.darkGreen,
+      child: ListView(
+        padding: const EdgeInsets.fromLTRB(
+          14,
+          14,
+          14,
+          90,
+        ),
+        children: [
+          _buildFilterCard(theme, isDark),
+          const SizedBox(height: 14),
+          _buildTotalCard(theme, isDark),
+          const SizedBox(height: 14),
 
-    final totalExpense = _transactions
-        .where((e) => e.type == 'Expense')
-        .fold<double>(
-          0,
-          (sum, item) => sum + item.amount,
-        );
+          if (_filteredTransactions.isEmpty)
+            _buildEmptyState()
+          else
+            ..._filteredTransactions.reversed.map(
+              (transaction) =>
+                  _buildTransactionCard(
+                transaction,
+                theme,
+                isDark,
+              ),
+            ),
+        ],
+      ),
+    );
+  }
 
-    final balance = totalIncome - totalExpense;
-
-    final Map<String, List<MoneyTransaction>> groupedTrans = {};
-
-    for (final trans in _transactions) {
-      groupedTrans.putIfAbsent(
-        trans.date,
-        () => [],
-      ).add(trans);
-    }
-
-    final dates = groupedTrans.keys.toList();
-
-    return Column(
-      children: [
-        Container(
-          padding: const EdgeInsets.symmetric(
-            vertical: 12,
-            horizontal: 16,
+  Widget _buildFilterCard(
+    ThemeData theme,
+    bool isDark,
+  ) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppTheme.cardColor,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(
+          color: AppTheme.gold.withValues(
+            alpha: isDark ? 0.30 : 0.20,
           ),
-          color: isDark
-              ? AppTheme.cardLightDark
-              : Colors.white,
-          child: Row(
-            mainAxisAlignment:
-                MainAxisAlignment.spaceAround,
+        ),
+      ),
+      child: Column(
+        children: [
+          Row(
             children: [
-              _summaryItem(
-                'Income',
-                totalIncome,
-                Colors.blue,
-                theme,
+              Expanded(
+                child: DropdownButtonFormField<String>(
+                  initialValue: _filterType,
+                  decoration: InputDecoration(
+                    labelText: 'সময়',
+                    prefixIcon: Icon(
+                      Icons.filter_alt_outlined,
+                      color: isDark
+                          ? AppTheme.gold
+                          : AppTheme.darkGreen,
+                    ),
+                  ),
+                  items: const [
+                    DropdownMenuItem(
+                      value: 'Daily',
+                      child: Text('দৈনিক'),
+                    ),
+                    DropdownMenuItem(
+                      value: 'Weekly',
+                      child: Text('সাপ্তাহিক'),
+                    ),
+                    DropdownMenuItem(
+                      value: 'Monthly',
+                      child: Text('মাসিক'),
+                    ),
+                    DropdownMenuItem(
+                      value: 'Yearly',
+                      child: Text('বার্ষিক'),
+                    ),
+                  ],
+                  onChanged: (value) {
+                    if (value == null) return;
+
+                    setState(() {
+                      _filterType = value;
+                    });
+                  },
+                ),
               ),
-              _summaryItem(
-                'Expenses',
-                totalExpense,
-                Colors.redAccent,
-                theme,
-              ),
-              _summaryItem(
-                'Total',
-                balance,
-                theme.textTheme.bodyLarge?.color ??
-                    Colors.black,
-                theme,
+              const SizedBox(width: 10),
+              IconButton(
+                onPressed: _pickDate,
+                icon: Icon(
+                  Icons.calendar_month_rounded,
+                  color: isDark
+                      ? AppTheme.gold
+                      : AppTheme.darkGreen,
+                ),
               ),
             ],
           ),
+          const SizedBox(height: 8),
+          Text(
+            _filterType == 'Daily'
+                ? DateFormat(
+                    'dd MMMM yyyy',
+                  ).format(_selectedDate)
+                : _filterType == 'Yearly'
+                    ? DateFormat(
+                        'yyyy',
+                      ).format(_selectedDate)
+                    : DateFormat(
+                        'MMMM yyyy',
+                      ).format(_selectedDate),
+            style: TextStyle(
+              color: AppTheme.textPrimary,
+              fontSize: 14,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _pickDate() async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _selectedDate,
+      firstDate: DateTime(2020),
+      lastDate: DateTime(2100),
+    );
+
+    if (picked == null) return;
+
+    setState(() {
+      _selectedDate = picked;
+    });
+  }
+
+  Widget _buildTotalCard(
+    ThemeData theme,
+    bool isDark,
+  ) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: isDark
+              ? [
+                  AppTheme.cardLightDark,
+                  AppTheme.cardColorDark,
+                ]
+              : [
+                  Colors.white,
+                  AppTheme.backgroundSecondaryLight,
+                ],
         ),
-        Expanded(
-          child: _transactions.isEmpty
-              ? Center(
-                  child: Text(
-                    'কোনো লেনদেন পাওয়া যায়নি',
-                    style: TextStyle(
-                      color:
-                          theme.textTheme.bodySmall?.color ??
-                              Colors.grey,
-                    ),
-                  ),
-                )
-              : ListView.builder(
-                  itemCount: dates.length,
-                  itemBuilder: (context, index) {
-                    final dateStr = dates[index];
-                    final dayTrans =
-                        groupedTrans[dateStr]!;
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: AppTheme.gold.withValues(
+            alpha: isDark ? 0.35 : 0.25,
+          ),
+        ),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: _miniAmount(
+              'আয়',
+              _totalIncome,
+              Colors.blue,
+              Icons.arrow_downward_rounded,
+            ),
+          ),
+          Container(
+            width: 1,
+            height: 50,
+            color: theme.dividerColor,
+          ),
+          Expanded(
+            child: _miniAmount(
+              'খরচ',
+              _totalExpense,
+              Colors.redAccent,
+              Icons.arrow_upward_rounded,
+            ),
+          ),
+          Container(
+            width: 1,
+            height: 50,
+            color: theme.dividerColor,
+          ),
+          Expanded(
+            child: _miniAmount(
+              'ব্যালেন্স',
+              _balance,
+              _balance >= 0
+                  ? Colors.green
+                  : Colors.redAccent,
+              Icons.account_balance_rounded,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 
-                    final dayIncome = dayTrans
-                        .where((e) => e.type == 'Income')
-                        .fold<double>(
-                          0,
-                          (sum, item) => sum + item.amount,
-                        );
-
-                    final dayExpense = dayTrans
-                        .where((e) => e.type == 'Expense')
-                        .fold<double>(
-                          0,
-                          (sum, item) => sum + item.amount,
-                        );
-
-                    return Column(
-                      crossAxisAlignment:
-                          CrossAxisAlignment.start,
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 8,
-                          ),
-                          color: isDark
-                              ? AppTheme.cardLightDark
-                                  .withValues(alpha: 0.5)
-                              : const Color(0xFFEFEFEF),
-                          child: Row(
-                            mainAxisAlignment:
-                                MainAxisAlignment.spaceBetween,
-                            children: [
-                              Text(
-                                dateStr,
-                                style: TextStyle(
-                                  color: theme.textTheme
-                                      .titleMedium
-                                      ?.color,
-                                  fontWeight:
-                                      FontWeight.bold,
-                                  fontSize: 14,
-                                ),
-                              ),
-                              Row(
-                                children: [
-                                  if (dayIncome > 0)
-                                    Text(
-                                      '৳ ${dayIncome.toStringAsFixed(2)}  ',
-                                      style: const TextStyle(
-                                        color: Colors.blue,
-                                        fontSize: 13,
-                                        fontWeight:
-                                            FontWeight.bold,
-                                      ),
-                                    ),
-                                  if (dayExpense > 0)
-                                    Text(
-                                      '৳ ${dayExpense.toStringAsFixed(2)}',
-                                      style: const TextStyle(
-                                        color:
-                                            Colors.redAccent,
-                                        fontSize: 13,
-                                        fontWeight:
-                                            FontWeight.bold,
-                                      ),
-                                    ),
-                                ],
-                              ),
-                            ],
-                          ),
-                        ),
-                        ...dayTrans.map(
-                          (item) {
-                            final isIncome =
-                                item.type == 'Income';
-                            final isTransfer =
-                                item.type == 'Transfer';
-
-                            return Container(
-                              decoration: BoxDecoration(
-                                border: Border(
-                                  bottom: BorderSide(
-                                    color:
-                                        theme.dividerColor,
-                                    width: 0.5,
-                                  ),
-                                ),
-                              ),
-                              child: ListTile(
-                                dense: true,
-                                title: Text(
-                                  item.category,
-                                  style: TextStyle(
-                                    color: theme.textTheme
-                                        .bodyLarge
-                                        ?.color,
-                                    fontWeight:
-                                        FontWeight.w600,
-                                    fontSize: 15,
-                                  ),
-                                ),
-                                subtitle: Text(
-                                  (item.note ?? '').isNotEmpty
-                                      ? '${item.account} • ${item.note}'
-                                      : item.account,
-                                  style: TextStyle(
-                                    color: theme.textTheme
-                                        .bodySmall
-                                        ?.color,
-                                    fontSize: 12,
-                                  ),
-                                ),
-                                trailing: Text(
-                                  '৳ ${item.amount.toStringAsFixed(2)}',
-                                  style: TextStyle(
-                                    color: isIncome
-                                        ? Colors.blue
-                                        : isTransfer
-                                            ? Colors.orange
-                                            : Colors.redAccent,
-                                    fontWeight:
-                                        FontWeight.bold,
-                                    fontSize: 15,
-                                  ),
-                                ),
-                              ),
-                            );
-                          },
-                        ),
-                      ],
-                    );
-                  },
-                ),
+  Widget _miniAmount(
+    String title,
+    double amount,
+    Color color,
+    IconData icon,
+  ) {
+    return Column(
+      children: [
+        Icon(
+          icon,
+          color: color,
+          size: 20,
+        ),
+        const SizedBox(height: 5),
+        Text(
+          title,
+          style: TextStyle(
+            color: AppTheme.textMuted,
+            fontSize: 10,
+          ),
+        ),
+        const SizedBox(height: 3),
+        FittedBox(
+          child: Text(
+            '৳ ${amount.toStringAsFixed(0)}',
+            style: TextStyle(
+              color: color,
+              fontSize: 14,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
         ),
       ],
     );
   }
 
-  Widget _summaryItem(
-    String label,
-    double amount,
-    Color color,
+  Widget _buildEmptyState() {
+    return Container(
+      padding: const EdgeInsets.all(35),
+      decoration: BoxDecoration(
+        color: AppTheme.cardColor,
+        borderRadius: BorderRadius.circular(18),
+      ),
+      child: Column(
+        children: [
+          Icon(
+            Icons.receipt_long_outlined,
+            size: 50,
+            color: AppTheme.textMuted,
+          ),
+          const SizedBox(height: 12),
+          Text(
+            'এই সময়ের কোনো লেনদেন নেই',
+            style: TextStyle(
+              color: AppTheme.textMuted,
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTransactionCard(
+    MoneyTransaction transaction,
     ThemeData theme,
+    bool isDark,
   ) {
-    return Column(
-      children: [
-        Text(
-          label,
-          style: TextStyle(
-            color:
-                theme.textTheme.bodySmall?.color ??
-                    Colors.grey,
-            fontSize: 13,
-          ),
+    final isIncome = transaction.type == 'Income';
+    final isExpense = transaction.type == 'Expense';
+
+    final Color color = isIncome
+        ? Colors.blue
+        : isExpense
+            ? Colors.redAccent
+            : AppTheme.gold;
+
+    final IconData icon = isIncome
+        ? Icons.arrow_downward_rounded
+        : isExpense
+            ? Icons.arrow_upward_rounded
+            : Icons.swap_horiz_rounded;
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(13),
+      decoration: BoxDecoration(
+        color: AppTheme.cardColor,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: color.withValues(alpha: 0.25),
         ),
-        const SizedBox(height: 4),
-        Text(
-          '৳ ${amount.toStringAsFixed(2)}',
-          style: TextStyle(
-            color: color,
-            fontWeight: FontWeight.bold,
-            fontSize: 15,
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 42,
+            height: 42,
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(
+              icon,
+              color: color,
+              size: 21,
+            ),
           ),
-        ),
-      ],
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment:
+                  CrossAxisAlignment.start,
+              children: [
+                Text(
+                  transaction.category,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: AppTheme.textPrimary,
+                    fontSize: 13.5,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  transaction.account,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: AppTheme.textMuted,
+                    fontSize: 11,
+                  ),
+                ),
+                if (transaction.note.trim().isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(
+                      top: 3,
+                    ),
+                    child: Text(
+                      transaction.note,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: AppTheme.textMuted,
+                        fontSize: 10.5,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          Column(
+            crossAxisAlignment:
+                CrossAxisAlignment.end,
+            children: [
+              Text(
+                '৳ ${transaction.amount.toStringAsFixed(2)}',
+                style: TextStyle(
+                  color: color,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                transaction.date,
+                style: TextStyle(
+                  color: AppTheme.textMuted,
+                  fontSize: 9.5,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
     );
   }
 
@@ -531,411 +723,293 @@ class _MoneyManagerScreenState extends State<MoneyManagerScreen> {
     ThemeData theme,
     bool isDark,
   ) {
-    final filteredTrans =
-        _getFilteredTransactions();
-
-    final totalIncome = filteredTrans
+    final income = _filteredTransactions
         .where((e) => e.type == 'Income')
-        .fold<double>(
-          0,
-          (sum, item) => sum + item.amount,
-        );
-
-    final totalExpense = filteredTrans
-        .where((e) => e.type == 'Expense')
-        .fold<double>(
-          0,
-          (sum, item) => sum + item.amount,
-        );
-
-    final currentList = filteredTrans
-        .where(
-          (e) => e.type ==
-              (_statsTab == 0
-                  ? 'Income'
-                  : 'Expense'),
-        )
         .toList();
 
-    final currentTotal = currentList.fold<double>(
-      0,
-      (sum, item) => sum + item.amount,
-    );
+    final expense = _filteredTransactions
+        .where((e) => e.type == 'Expense')
+        .toList();
 
-    final Map<String, double> categoryMap = {};
+    final selected =
+        _statsTab == 0 ? income : expense;
 
-    for (final e in currentList) {
-      categoryMap[e.category] =
-          (categoryMap[e.category] ?? 0) + e.amount;
-    }
+    final color =
+        _statsTab == 0 ? Colors.blue : Colors.redAccent;
 
-    final sortedEntries =
-        categoryMap.entries.toList()
-          ..sort(
-            (a, b) => b.value.compareTo(a.value),
-          );
-
-    final List<Color> pieColors = [
-      const Color(0xFFFF6B6B),
-      const Color(0xFFFF9F43),
-      const Color(0xFFFFD93D),
-      const Color(0xFF6BCB77),
-      const Color(0xFF4D96FF),
-      const Color(0xFF9B59B6),
-      const Color(0xFF1ABC9C),
-      const Color(0xFFE67E22),
-    ];
-
-    final textColor =
-        theme.textTheme.bodyLarge?.color;
-
-    return Column(
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(
+        14,
+        14,
+        14,
+        30,
+      ),
       children: [
-        Padding(
-          padding: const EdgeInsets.symmetric(
-            horizontal: 16,
-            vertical: 8,
-          ),
-          child: Row(
-            mainAxisAlignment:
-                MainAxisAlignment.spaceBetween,
-            children: [
-              Row(
-                children: [
-                  IconButton(
-                    icon: Icon(
-                      Icons.chevron_left,
-                      color: textColor,
-                    ),
-                    onPressed: () {
-                      setState(() {
-                        if (_filterType == 'Yearly') {
-                          _selectedDate = DateTime(
-                            _selectedDate.year - 1,
-                          );
-                        } else {
-                          _selectedDate = DateTime(
-                            _selectedDate.year,
-                            _selectedDate.month - 1,
-                            _selectedDate.day,
-                          );
-                        }
-                      });
-                    },
-                  ),
-                  Text(
-                    _filterType == 'Yearly'
-                        ? DateFormat('yyyy')
-                            .format(_selectedDate)
-                        : DateFormat('MMM yyyy')
-                            .format(_selectedDate),
-                    style: TextStyle(
-                      color: textColor,
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  IconButton(
-                    icon: Icon(
-                      Icons.chevron_right,
-                      color: textColor,
-                    ),
-                    onPressed: () {
-                      setState(() {
-                        if (_filterType == 'Yearly') {
-                          _selectedDate = DateTime(
-                            _selectedDate.year + 1,
-                          );
-                        } else {
-                          _selectedDate = DateTime(
-                            _selectedDate.year,
-                            _selectedDate.month + 1,
-                            _selectedDate.day,
-                          );
-                        }
-                      });
-                    },
-                  ),
-                ],
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 4,
-                ),
-                decoration: BoxDecoration(
-                  color: isDark
-                      ? AppTheme.cardLightDark
-                      : Colors.white,
-                  borderRadius:
-                      BorderRadius.circular(8),
-                  border: Border.all(
-                    color: theme.dividerColor,
-                  ),
-                ),
-                child: DropdownButtonHideUnderline(
-                  child: DropdownButton<String>(
-                    value: _filterType,
-                    dropdownColor: isDark
-                        ? AppTheme.cardColorDark
-                        : Colors.white,
-                    style: TextStyle(
-                      color: textColor,
-                      fontSize: 13,
-                    ),
-                    icon: Icon(
-                      Icons.keyboard_arrow_down,
-                      color: textColor,
-                    ),
-                    items: const [
-                      'Daily',
-                      'Weekly',
-                      'Monthly',
-                      'Yearly',
-                    ].map(
-                      (value) {
-                        return DropdownMenuItem<String>(
-                          value: value,
-                          child: Text(value),
-                        );
-                      },
-                    ).toList(),
-                    onChanged: (value) {
-                      if (value != null) {
-                        setState(() {
-                          _filterType = value;
-                        });
-                      }
-                    },
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
         Row(
           children: [
             Expanded(
-              child: GestureDetector(
-                onTap: () {
+              child: _statsTabButton(
+                'আয়',
+                _statsTab == 0,
+                Colors.blue,
+                () {
                   setState(() {
                     _statsTab = 0;
                   });
                 },
-                child: Column(
-                  children: [
-                    Text(
-                      'Income  ৳ ${totalIncome.toStringAsFixed(2)}',
-                      style: TextStyle(
-                        color: _statsTab == 0
-                            ? Colors.blue
-                            : theme.textTheme.bodySmall
-                                ?.color,
-                        fontSize: 15,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Container(
-                      height: 3,
-                      color: _statsTab == 0
-                          ? Colors.blue
-                          : Colors.transparent,
-                    ),
-                  ],
-                ),
               ),
             ),
+            const SizedBox(width: 10),
             Expanded(
-              child: GestureDetector(
-                onTap: () {
+              child: _statsTabButton(
+                'খরচ',
+                _statsTab == 1,
+                Colors.redAccent,
+                () {
                   setState(() {
                     _statsTab = 1;
                   });
                 },
-                child: Column(
-                  children: [
-                    Text(
-                      'Expenses  ৳ ${totalExpense.toStringAsFixed(2)}',
-                      style: TextStyle(
-                        color: _statsTab == 1
-                            ? Colors.redAccent
-                            : theme.textTheme.bodySmall
-                                ?.color,
-                        fontSize: 15,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Container(
-                      height: 3,
-                      color: _statsTab == 1
-                          ? Colors.redAccent
-                          : Colors.transparent,
-                    ),
-                  ],
-                ),
               ),
             ),
           ],
         ),
-        Divider(
-          color: theme.dividerColor,
-          height: 1,
+        const SizedBox(height: 16),
+        _buildPieChartCard(
+          selected,
+          color,
         ),
-        Expanded(
-          child: sortedEntries.isEmpty
-              ? Center(
-                  child: Text(
-                    'এই সময়সীমার কোনো তথ্য পাওয়া যায়নি',
-                    style: TextStyle(
-                      color: theme.textTheme
-                          .bodySmall
-                          ?.color,
-                    ),
+        const SizedBox(height: 16),
+        _buildCategoryStats(
+          selected,
+          color,
+          theme,
+        ),
+      ],
+    );
+  }
+
+  Widget _statsTabButton(
+    String title,
+    bool selected,
+    Color color,
+    VoidCallback onTap,
+  ) {
+    return InkWell(
+      borderRadius: BorderRadius.circular(15),
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(
+          vertical: 13,
+        ),
+        decoration: BoxDecoration(
+          color: selected
+              ? color.withValues(alpha: 0.12)
+              : AppTheme.cardColor,
+          borderRadius: BorderRadius.circular(15),
+          border: Border.all(
+            color: selected
+                ? color.withValues(alpha: 0.45)
+                : AppTheme.gold.withValues(
+                    alpha: 0.20,
                   ),
-                )
-              : Column(
+          ),
+        ),
+        child: Center(
+          child: Text(
+            title,
+            style: TextStyle(
+              color: selected
+                  ? color
+                  : AppTheme.textMuted,
+              fontSize: 13,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPieChartCard(
+    List<MoneyTransaction> transactions,
+    Color color,
+  ) {
+    final Map<String, double> categoryMap = {};
+
+    for (final item in transactions) {
+      categoryMap[item.category] =
+          (categoryMap[item.category] ?? 0) +
+              item.amount;
+    }
+
+    if (categoryMap.isEmpty) {
+      return _buildEmptyState();
+    }
+
+    final entries = categoryMap.entries.toList()
+      ..sort(
+        (a, b) => b.value.compareTo(a.value),
+      );
+
+    final topEntries = entries.take(6).toList();
+
+    return Container(
+      height: 290,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppTheme.cardColor,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: AppTheme.gold.withValues(
+            alpha: 0.25,
+          ),
+        ),
+      ),
+      child: Column(
+        children: [
+          Text(
+            'ক্যাটাগরি অনুযায়ী পরিসংখ্যান',
+            style: TextStyle(
+              color: AppTheme.textPrimary,
+              fontSize: 15,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          const SizedBox(height: 12),
+          Expanded(
+            child: PieChart(
+              PieChartData(
+                centerSpaceRadius: 42,
+                sectionsSpace: 3,
+                sections: List.generate(
+                  topEntries.length,
+                  (index) {
+                    return PieChartSectionData(
+                      value: topEntries[index].value,
+                      title: '',
+                      radius: 58,
+                      color: _chartColor(
+                        index,
+                        color,
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Color _chartColor(
+    int index,
+    Color base,
+  ) {
+    final colors = [
+      base,
+      Colors.green,
+      AppTheme.gold,
+      Colors.orange,
+      Colors.purple,
+      Colors.teal,
+    ];
+
+    return colors[index % colors.length];
+  }
+
+  Widget _buildCategoryStats(
+    List<MoneyTransaction> transactions,
+    Color accent,
+    ThemeData theme,
+  ) {
+    if (transactions.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    final Map<String, double> categoryMap = {};
+
+    for (final item in transactions) {
+      categoryMap[item.category] =
+          (categoryMap[item.category] ?? 0) +
+              item.amount;
+    }
+
+    final entries = categoryMap.entries.toList()
+      ..sort(
+        (a, b) => b.value.compareTo(a.value),
+      );
+
+    final total = entries.fold<double>(
+      0,
+      (sum, item) => sum + item.value,
+    );
+
+    return Container(
+      decoration: BoxDecoration(
+        color: AppTheme.cardColor,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(
+          color: AppTheme.gold.withValues(
+            alpha: 0.25,
+          ),
+        ),
+      ),
+      child: Column(
+        children: entries.map((entry) {
+          final percentage = total == 0
+              ? 0.0
+              : entry.value / total;
+
+          return Padding(
+            padding: const EdgeInsets.symmetric(
+              horizontal: 15,
+              vertical: 12,
+            ),
+            child: Column(
+              children: [
+                Row(
                   children: [
-                    const SizedBox(height: 20),
-                    SizedBox(
-                      height: 200,
-                      child: PieChart(
-                        PieChartData(
-                          sectionsSpace: 2,
-                          centerSpaceRadius: 0,
-                          sections:
-                              sortedEntries.asMap().entries.map(
-                            (entry) {
-                              final idx = entry.key;
-                              final item = entry.value;
-
-                              final percentage =
-                                  currentTotal == 0
-                                      ? 0
-                                      : (item.value /
-                                              currentTotal) *
-                                          100;
-
-                              final color =
-                                  pieColors[
-                                      idx %
-                                          pieColors.length];
-
-                              return PieChartSectionData(
-                                color: color,
-                                value: item.value,
-                                title:
-                                    '${item.key}\n${percentage.toStringAsFixed(1)}%',
-                                radius: 95,
-                                titleStyle:
-                                    const TextStyle(
-                                  color: Colors.white,
-                                  fontWeight:
-                                      FontWeight.bold,
-                                  fontSize: 11,
-                                ),
-                              );
-                            },
-                          ).toList(),
+                    Expanded(
+                      child: Text(
+                        entry.key,
+                        style: TextStyle(
+                          color: AppTheme.textPrimary,
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w600,
                         ),
                       ),
                     ),
-                    const SizedBox(height: 15),
-                    Expanded(
-                      child: Container(
-                        color: theme.cardColor,
-                        child: ListView.separated(
-                          itemCount:
-                              sortedEntries.length,
-                          separatorBuilder:
-                              (context, index) {
-                            return Divider(
-                              color:
-                                  theme.dividerColor,
-                              height: 1,
-                            );
-                          },
-                          itemBuilder:
-                              (context, index) {
-                            final item =
-                                sortedEntries[index];
-
-                            final percentage =
-                                currentTotal == 0
-                                    ? 0
-                                    : (item.value /
-                                            currentTotal) *
-                                        100;
-
-                            final color =
-                                pieColors[
-                                    index %
-                                        pieColors.length];
-
-                            return Padding(
-                              padding:
-                                  const EdgeInsets.symmetric(
-                                horizontal: 16,
-                                vertical: 12,
-                              ),
-                              child: Row(
-                                children: [
-                                  Container(
-                                    width: 45,
-                                    height: 26,
-                                    alignment:
-                                        Alignment.center,
-                                    decoration:
-                                        BoxDecoration(
-                                      color: color,
-                                      borderRadius:
-                                          BorderRadius
-                                              .circular(6),
-                                    ),
-                                    child: Text(
-                                      '${percentage.toStringAsFixed(0)}%',
-                                      style:
-                                          const TextStyle(
-                                        color: Colors.white,
-                                        fontWeight:
-                                            FontWeight.bold,
-                                        fontSize: 12,
-                                      ),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 14),
-                                  Expanded(
-                                    child: Text(
-                                      item.key,
-                                      style: TextStyle(
-                                        color: textColor,
-                                        fontSize: 15,
-                                        fontWeight:
-                                            FontWeight.w500,
-                                      ),
-                                    ),
-                                  ),
-                                  Text(
-                                    '৳ ${item.value.toStringAsFixed(2)}',
-                                    style: TextStyle(
-                                      color: textColor,
-                                      fontSize: 15,
-                                      fontWeight:
-                                          FontWeight.bold,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            );
-                          },
-                        ),
+                    Text(
+                      '৳ ${entry.value.toStringAsFixed(2)}',
+                      style: TextStyle(
+                        color: accent,
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w800,
                       ),
                     ),
                   ],
                 ),
-        ),
-      ],
+                const SizedBox(height: 6),
+                LinearProgressIndicator(
+                  value: percentage,
+                  minHeight: 5,
+                  borderRadius:
+                      BorderRadius.circular(10),
+                  backgroundColor:
+                      accent.withValues(alpha: 0.08),
+                  valueColor:
+                      AlwaysStoppedAnimation<Color>(
+                    accent,
+                  ),
+                ),
+              ],
+            ),
+          );
+        }).toList(),
+      ),
     );
   }
 
@@ -947,171 +1021,214 @@ class _MoneyManagerScreenState extends State<MoneyManagerScreen> {
     ThemeData theme,
     bool isDark,
   ) {
-    return ListView.builder(
-      itemCount: _accounts.length,
-      itemBuilder: (context, index) {
-        final acc = _accounts[index];
-        final currentBalance =
-            _calculateAccountBalance(acc);
-
-        return Container(
-          margin: const EdgeInsets.symmetric(
-            horizontal: 16,
-            vertical: 6,
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(
+        14,
+        14,
+        14,
+        30,
+      ),
+      children: [
+        Text(
+          'অ্যাকাউন্টসমূহ',
+          style: TextStyle(
+            color: AppTheme.textPrimary,
+            fontSize: 19,
+            fontWeight: FontWeight.w900,
           ),
-          decoration: BoxDecoration(
-            color: theme.cardColor,
-            borderRadius: BorderRadius.circular(10),
-            border: Border.all(
-              color: theme.dividerColor,
-              width: 0.5,
-            ),
+        ),
+        const SizedBox(height: 6),
+        Text(
+          'প্রতিটি অ্যাকাউন্টের বর্তমান ব্যালেন্স',
+          style: TextStyle(
+            color: AppTheme.textMuted,
+            fontSize: 12,
           ),
-          child: ListTile(
-            leading: Icon(
-              Icons.account_balance_wallet,
-              color: isDark
-                  ? AppTheme.gold
-                  : AppTheme.darkGreen,
-            ),
-            title: Text(
-              acc,
-              style: TextStyle(
-                color:
-                    theme.textTheme.titleMedium?.color,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            subtitle: Text(
-              'ব্যালেন্স: ৳ ${currentBalance.toStringAsFixed(2)}',
-              style: TextStyle(
-                color: currentBalance >= 0
-                    ? Colors.green
-                    : Colors.redAccent,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            trailing: IconButton(
-              icon: Icon(
-                Icons.edit,
-                color:
-                    theme.textTheme.bodySmall?.color,
-              ),
-              onPressed: () {
-                _showEditAccountDialog(
-                  index,
-                  theme,
-                );
-              },
-            ),
+        ),
+        const SizedBox(height: 16),
+        ..._accounts.map(
+          (account) => _buildAccountCard(
+            account,
+            isDark,
           ),
-        );
-      },
+        ),
+      ],
     );
   }
 
-  void _showEditAccountDialog(
-    int index,
-    ThemeData theme,
+  Widget _buildAccountCard(
+    String account,
+    bool isDark,
   ) {
-    final controller = TextEditingController(
-      text: _accounts[index],
-    );
+    final balance =
+        _accountBalance(account);
 
-    showDialog(
-      context: context,
-      builder: (ctx) {
-        return AlertDialog(
-          backgroundColor: theme.cardColor,
-          title: Text(
-            'অ্যাকাউন্টের নাম পরিবর্তন',
-            style: TextStyle(
-              color:
-                  theme.textTheme.titleLarge?.color,
+    final color = balance >= 0
+        ? (isDark
+            ? AppTheme.gold
+            : AppTheme.darkGreen)
+        : Colors.redAccent;
+
+    IconData icon;
+
+    switch (account) {
+      case 'Cash':
+        icon = Icons.payments_rounded;
+        break;
+      case 'Bkash':
+        icon = Icons.phone_android_rounded;
+        break;
+      case 'Bank Account':
+        icon = Icons.account_balance_rounded;
+        break;
+      case 'Nagad':
+        icon =
+            Icons.account_balance_wallet_rounded;
+        break;
+      case 'Card':
+        icon = Icons.credit_card_rounded;
+        break;
+      default:
+        icon = Icons.wallet_rounded;
+    }
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 11),
+      padding: const EdgeInsets.all(15),
+      decoration: BoxDecoration(
+        color: AppTheme.cardColor,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(
+          color: color.withValues(alpha: 0.30),
+        ),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 46,
+            height: 46,
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: Icon(
+              icon,
+              color: color,
             ),
           ),
-          content: TextField(
-            controller: controller,
-            style: TextStyle(
-              color:
-                  theme.textTheme.bodyLarge?.color,
-            ),
-            decoration: const InputDecoration(
-              border: OutlineInputBorder(),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              account,
+              style: TextStyle(
+                color: AppTheme.textPrimary,
+                fontSize: 14,
+                fontWeight: FontWeight.w800,
+              ),
             ),
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text('Cancel'),
+          Text(
+            '৳ ${balance.toStringAsFixed(2)}',
+            style: TextStyle(
+              color: color,
+              fontSize: 15,
+              fontWeight: FontWeight.w900,
             ),
-            ElevatedButton(
-              onPressed: () {
-                final newName =
-                    controller.text.trim();
-
-                if (newName.isNotEmpty) {
-                  setState(() {
-                    _accounts[index] = newName;
-                  });
-                }
-
-                Navigator.pop(ctx);
-              },
-              child: const Text('Save'),
-            ),
-          ],
-        );
-      },
+          ),
+        ],
+      ),
     );
   }
 
   // ============================================================
-  // MORE
+  // REPORT
   // ============================================================
 
-  Widget _buildMoreView(
+  Widget _buildReportView(
     ThemeData theme,
     bool isDark,
   ) {
     return Center(
-      child: ElevatedButton.icon(
-        style: ElevatedButton.styleFrom(
-          backgroundColor: isDark
-              ? AppTheme.gold
-              : AppTheme.darkGreen,
-          padding: const EdgeInsets.symmetric(
-            horizontal: 20,
-            vertical: 12,
-          ),
-        ),
-        icon: const Icon(
-          Icons.backup,
-          color: Colors.white,
-        ),
-        label: const Text(
-          'Google Drive-এ ব্যাকআপ নিন',
-          style: TextStyle(
-            color: Colors.white,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        onPressed: () async {
-          final ok =
-              await MoneyDbHelper.autoBackupToDrive();
-
-          if (!mounted) return;
-
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                ok
-                    ? 'গুগল ড্রাইভে ব্যাকআপ সফল হয়েছে!'
-                    : 'ব্যাকআপ নেওয়া সম্ভব হয়নি',
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisAlignment:
+              MainAxisAlignment.center,
+          children: [
+            Container(
+              width: 90,
+              height: 90,
+              decoration: BoxDecoration(
+                color: (isDark
+                        ? AppTheme.gold
+                        : AppTheme.darkGreen)
+                    .withValues(alpha: 0.12),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                Icons.assessment_rounded,
+                size: 48,
+                color: isDark
+                    ? AppTheme.gold
+                    : AppTheme.darkGreen,
               ),
             ),
-          );
-        },
+            const SizedBox(height: 18),
+            Text(
+              'মাসিক রিপোর্ট',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: AppTheme.textPrimary,
+                fontSize: 22,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'আয়, খরচ ও ক্যাটাগরি অনুযায়ী বিস্তারিত মাসিক রিপোর্ট দেখুন',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: AppTheme.textMuted,
+                fontSize: 12.5,
+                height: 1.5,
+              ),
+            ),
+            const SizedBox(height: 25),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: _openReport,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: isDark
+                      ? AppTheme.gold
+                      : AppTheme.darkGreen,
+                  foregroundColor: isDark
+                      ? Colors.black
+                      : Colors.white,
+                  padding:
+                      const EdgeInsets.symmetric(
+                    vertical: 15,
+                  ),
+                  shape:
+                      RoundedRectangleBorder(
+                    borderRadius:
+                        BorderRadius.circular(15),
+                  ),
+                ),
+                icon: const Icon(
+                  Icons.bar_chart_rounded,
+                ),
+                label: const Text(
+                  'রিপোর্ট দেখুন',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -1120,386 +1237,425 @@ class _MoneyManagerScreenState extends State<MoneyManagerScreen> {
   // ADD TRANSACTION
   // ============================================================
 
-  void _showAddTransactionModal(
-    BuildContext context,
-    ThemeData theme,
-    bool isDark,
-  ) {
+  void _showAddTransaction() {
     String type = 'Expense';
+
     String selectedCategory =
         _expenseCategories.first;
-    String selectedAccount = _accounts.first;
 
-    String targetAccount = _accounts.length > 1
-        ? _accounts[1]
-        : _accounts.first;
+    String selectedAccount =
+        _accounts.first;
 
-    double amount = 0;
-    String note = '';
+    String targetAccount =
+        _accounts.length > 1
+            ? _accounts[1]
+            : _accounts.first;
+
+    final amountController =
+        TextEditingController();
+
+    final noteController =
+        TextEditingController();
 
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: theme.cardColor,
-      builder: (ctx) {
+      backgroundColor: Colors.transparent,
+      builder: (sheetContext) {
         return StatefulBuilder(
-          builder: (context, setModalState) {
-            final List<String> currentCategories =
-                type == 'Expense'
-                    ? _expenseCategories
-                    : type == 'Income'
-                        ? _incomeCategories
-                        : _accounts;
+          builder: (
+            context,
+            setModalState,
+          ) {
+            final categories = type == 'Income'
+                ? _incomeCategories
+                : _expenseCategories;
 
-            final textColor =
-                theme.textTheme.bodyLarge?.color;
+            if (!categories
+                .contains(selectedCategory)) {
+              selectedCategory =
+                  categories.first;
+            }
 
-            return Padding(
+            return Container(
               padding: EdgeInsets.only(
-                bottom:
-                    MediaQuery.of(context).viewInsets.bottom,
-                left: 16,
-                right: 16,
-                top: 20,
+                left: 18,
+                right: 18,
+                top: 18,
+                bottom: MediaQuery.of(
+                      context,
+                    ).viewInsets.bottom +
+                    18,
+              ),
+              decoration: BoxDecoration(
+                color: AppTheme.background,
+                borderRadius:
+                    const BorderRadius.vertical(
+                  top: Radius.circular(25),
+                ),
               ),
               child: SingleChildScrollView(
                 child: Column(
-                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment:
+                      CrossAxisAlignment.start,
                   children: [
+                    Center(
+                      child: Container(
+                        width: 45,
+                        height: 5,
+                        decoration: BoxDecoration(
+                          color: AppTheme.textMuted
+                              .withValues(alpha: 0.35),
+                          borderRadius:
+                              BorderRadius.circular(10),
+                        ),
+                      ),
+                    ),
+
+                    const SizedBox(height: 20),
+
+                    Text(
+                      'নতুন লেনদেন',
+                      style: TextStyle(
+                        color: AppTheme.textPrimary,
+                        fontSize: 20,
+                        fontWeight:
+                            FontWeight.w900,
+                      ),
+                    ),
+
+                    const SizedBox(height: 16),
+
+                    // TYPE
                     Row(
-                      mainAxisAlignment:
-                          MainAxisAlignment.center,
                       children: [
-                        'Income',
-                        'Expense',
-                        'Transfer',
-                      ].map((t) {
-                        final isSelected = type == t;
-
-                        return Padding(
-                          padding:
-                              const EdgeInsets.symmetric(
-                            horizontal: 4,
-                          ),
-                          child: ChoiceChip(
-                            label: Text(t),
-                            selected: isSelected,
-                            selectedColor:
-                                isDark
-                                    ? AppTheme.gold
-                                    : AppTheme.darkGreen,
-                            labelStyle: TextStyle(
-                              color: isSelected
-                                  ? Colors.white
-                                  : textColor,
-                              fontWeight:
-                                  FontWeight.w600,
-                            ),
-                            onSelected: (value) {
-                              if (!value) return;
-
+                        Expanded(
+                          child: _typeButton(
+                            'আয়',
+                            Icons
+                                .arrow_downward_rounded,
+                            Colors.blue,
+                            type == 'Income',
+                            () {
                               setModalState(() {
-                                type = t;
-
-                                if (type == 'Expense') {
-                                  selectedCategory =
-                                      _expenseCategories
-                                          .first;
-                                } else if (type ==
-                                    'Income') {
-                                  selectedCategory =
-                                      _incomeCategories
-                                          .first;
-                                } else {
-                                  selectedCategory =
-                                      _accounts.first;
-                                }
+                                type = 'Income';
                               });
                             },
                           ),
-                        );
-                      }).toList(),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: _typeButton(
+                            'খরচ',
+                            Icons
+                                .arrow_upward_rounded,
+                            Colors.redAccent,
+                            type == 'Expense',
+                            () {
+                              setModalState(() {
+                                type = 'Expense';
+                              });
+                            },
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: _typeButton(
+                            'Transfer',
+                            Icons.swap_horiz_rounded,
+                            AppTheme.gold,
+                            type == 'Transfer',
+                            () {
+                              setModalState(() {
+                                type = 'Transfer';
+                              });
+                            },
+                          ),
+                        ),
+                      ],
                     ),
 
-                    const SizedBox(height: 15),
+                    const SizedBox(height: 16),
 
                     TextField(
+                      controller: amountController,
                       keyboardType:
-                          const TextInputType.numberWithOptions(
+                          const TextInputType
+                              .numberWithOptions(
                         decimal: true,
                       ),
-                      style: TextStyle(
-                        color: textColor,
-                      ),
-                      decoration: InputDecoration(
-                        labelText: 'পরিমাণ (Amount)',
-                        labelStyle: TextStyle(
-                          color: theme.textTheme
-                              .bodySmall
-                              ?.color,
+                      decoration:
+                          const InputDecoration(
+                        labelText: 'পরিমাণ',
+                        prefixText: '৳ ',
+                        prefixIcon: Icon(
+                          Icons.payments_outlined,
                         ),
-                        border:
-                            const OutlineInputBorder(),
                       ),
-                      onChanged: (value) {
-                        amount =
-                            double.tryParse(value) ?? 0;
-                      },
                     ),
 
-                    const SizedBox(height: 15),
+                    const SizedBox(height: 12),
 
                     DropdownButtonFormField<String>(
                       initialValue: selectedAccount,
-                      dropdownColor:
-                          theme.cardColor,
-                      style: TextStyle(
-                        color: textColor,
-                      ),
-                      decoration: InputDecoration(
-                        labelText: type == 'Transfer'
-                            ? 'কোথা থেকে (From Account)'
-                            : 'অ্যাকাউন্ট (Account)',
-                        labelStyle: TextStyle(
-                          color: theme.textTheme
-                              .bodySmall
-                              ?.color,
+                      decoration:
+                          const InputDecoration(
+                        labelText: 'অ্যাকাউন্ট',
+                        prefixIcon: Icon(
+                          Icons
+                              .account_balance_wallet_outlined,
                         ),
-                        border:
-                            const OutlineInputBorder(),
                       ),
-                      items: _accounts.map((acc) {
-                        return DropdownMenuItem<String>(
-                          value: acc,
-                          child: Text(acc),
-                        );
-                      }).toList(),
+                      items: _accounts
+                          .map(
+                            (account) =>
+                                DropdownMenuItem(
+                              value: account,
+                              child:
+                                  Text(account),
+                            ),
+                          )
+                          .toList(),
                       onChanged: (value) {
-                        if (value != null) {
-                          setModalState(() {
-                            selectedAccount = value;
-                          });
-                        }
+                        if (value == null) return;
+
+                        setModalState(() {
+                          selectedAccount =
+                              value;
+                        });
                       },
                     ),
 
-                    const SizedBox(height: 15),
-
                     if (type == 'Transfer') ...[
+                      const SizedBox(height: 12),
                       DropdownButtonFormField<String>(
                         initialValue: targetAccount,
-                        dropdownColor:
-                            theme.cardColor,
-                        style: TextStyle(
-                          color: textColor,
-                        ),
-                        decoration: InputDecoration(
+                        decoration:
+                            const InputDecoration(
                           labelText:
-                              'কোথায় (To Account)',
-                          labelStyle: TextStyle(
-                            color: theme.textTheme
-                                .bodySmall
-                                ?.color,
+                              'যে অ্যাকাউন্টে যাবে',
+                          prefixIcon: Icon(
+                            Icons
+                                .arrow_forward_rounded,
                           ),
-                          border:
-                              const OutlineInputBorder(),
                         ),
-                        items: _accounts.map((acc) {
-                          return DropdownMenuItem<String>(
-                            value: acc,
-                            child: Text(acc),
-                          );
-                        }).toList(),
+                        items: _accounts
+                            .map(
+                              (account) =>
+                                  DropdownMenuItem(
+                                value: account,
+                                child:
+                                    Text(account),
+                              ),
+                            )
+                            .toList(),
                         onChanged: (value) {
-                          if (value != null) {
+                          if (value == null) {
+                            return;
+                          }
+
+                          setModalState(() {
+                            targetAccount =
+                                value;
+                          });
+                        },
+                      ),
+                    ],
+
+                    if (type != 'Transfer') ...[
+                      const SizedBox(height: 12),
+                      DropdownButtonFormField<String>(
+                        initialValue:
+                            selectedCategory,
+                        decoration:
+                            const InputDecoration(
+                          labelText:
+                              'ক্যাটাগরি',
+                          prefixIcon: Icon(
+                            Icons
+                                .category_outlined,
+                          ),
+                        ),
+                        items: [
+                          ...categories.map(
+                            (category) =>
+                                DropdownMenuItem(
+                              value: category,
+                              child:
+                                  Text(category),
+                            ),
+                          ),
+                          const DropdownMenuItem(
+                            value: '__add__',
+                            child: Text(
+                              '+ নতুন ক্যাটাগরি যোগ করুন',
+                            ),
+                          ),
+                        ],
+                        onChanged: (value) async {
+                          if (value == null) {
+                            return;
+                          }
+
+                          if (value == '__add__') {
+                            final newCategory =
+                                await _addCategory(
+                              type,
+                            );
+
+                            if (newCategory !=
+                                null) {
+                              setModalState(() {
+                                selectedCategory =
+                                    newCategory;
+                              });
+                            }
+                          } else {
                             setModalState(() {
-                              targetAccount = value;
+                              selectedCategory =
+                                  value;
                             });
                           }
                         },
                       ),
-                      const SizedBox(height: 15),
-                    ] else ...[
-                      Row(
-                        mainAxisAlignment:
-                            MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text(
-                            'ক্যাটাগরি নির্ধারণ করুন:',
-                            style: TextStyle(
-                              color: textColor,
-                              fontWeight:
-                                  FontWeight.bold,
-                            ),
-                          ),
-                          TextButton.icon(
-                            icon: Icon(
-                              Icons.add,
-                              size: 16,
-                              color: isDark
-                                  ? AppTheme.gold
-                                  : AppTheme.darkGreen,
-                            ),
-                            label: Text(
-                              'Add New',
-                              style: TextStyle(
-                                color: isDark
-                                    ? AppTheme.gold
-                                    : AppTheme.darkGreen,
-                                fontSize: 12,
-                              ),
-                            ),
-                            onPressed: () {
-                              _showAddCategoryDialog(
-                                type,
-                                theme,
-                                () {
-                                  setModalState(() {});
-                                },
-                              );
-                            },
-                          ),
-                        ],
-                      ),
+                    ],
 
-                      const SizedBox(height: 8),
+                    const SizedBox(height: 12),
 
-                      GridView.builder(
-                        shrinkWrap: true,
-                        physics:
-                            const NeverScrollableScrollPhysics(),
-                        gridDelegate:
-                            const SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: 3,
-                          childAspectRatio: 2.3,
-                          crossAxisSpacing: 8,
-                          mainAxisSpacing: 8,
+                    TextField(
+                      controller: noteController,
+                      maxLines: 2,
+                      decoration:
+                          const InputDecoration(
+                        labelText:
+                            'নোট (ঐচ্ছিক)',
+                        prefixIcon: Icon(
+                          Icons.notes_rounded,
                         ),
-                        itemCount:
-                            currentCategories.length,
-                        itemBuilder: (c, i) {
-                          final cat =
-                              currentCategories[i];
+                      ),
+                    ),
 
-                          final isSelected =
-                              selectedCategory == cat;
+                    const SizedBox(height: 20),
 
-                          return GestureDetector(
-                            onTap: () {
-                              setModalState(() {
-                                selectedCategory = cat;
-                              });
-                            },
-                            child: Container(
-                              alignment:
-                                  Alignment.center,
-                              padding:
-                                  const EdgeInsets.symmetric(
-                                horizontal: 4,
-                              ),
-                              decoration:
-                                  BoxDecoration(
-                                color: isSelected
-                                    ? (isDark
-                                        ? AppTheme.gold
-                                        : AppTheme.darkGreen)
-                                    : (isDark
-                                        ? AppTheme.cardLightDark
-                                        : const Color(
-                                            0xFFEFEFEF,
-                                          )),
-                                borderRadius:
-                                    BorderRadius.circular(
-                                  8,
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton.icon(
+                        onPressed: () async {
+                          final amount =
+                              double.tryParse(
+                            amountController.text
+                                .trim(),
+                          );
+
+                          if (amount == null ||
+                              amount <= 0) {
+                            ScaffoldMessenger.of(
+                              context,
+                            ).showSnackBar(
+                              const SnackBar(
+                                content: Text(
+                                  'সঠিক পরিমাণ লিখুন',
                                 ),
                               ),
-                              child: Text(
-                                cat,
-                                style: TextStyle(
-                                  color: isSelected
-                                      ? Colors.white
-                                      : textColor,
-                                  fontSize: 11.5,
+                            );
+                            return;
+                          }
+
+                          if (type ==
+                                  'Transfer' &&
+                              selectedAccount ==
+                                  targetAccount) {
+                            ScaffoldMessenger.of(
+                              context,
+                            ).showSnackBar(
+                              const SnackBar(
+                                content: Text(
+                                  'একই অ্যাকাউন্টে Transfer করা যাবে না',
                                 ),
-                                textAlign:
-                                    TextAlign.center,
+                              ),
+                            );
+                            return;
+                          }
+
+                          final newTrans =
+                              MoneyTransaction(
+                            type: type,
+                            amount: amount,
+                            date: DateFormat(
+                              'dd/MM/yyyy',
+                            ).format(
+                              DateTime.now(),
+                            ),
+                            category:
+                                type == 'Transfer'
+                                    ? 'Transfer'
+                                    : selectedCategory,
+                            account:
+                                type == 'Transfer'
+                                    ? '$selectedAccount ➔ $targetAccount'
+                                    : selectedAccount,
+                            note:
+                                noteController.text
+                                    .trim(),
+                          );
+
+                          await MoneyDbHelper
+                              .instance
+                              .insertTransaction(
+                            newTrans,
+                          );
+
+                          if (!mounted) return;
+
+                          Navigator.pop(
+                            sheetContext,
+                          );
+
+                          await _loadData();
+
+                          if (!mounted) return;
+
+                          ScaffoldMessenger.of(
+                            context,
+                          ).showSnackBar(
+                            const SnackBar(
+                              content: Text(
+                                'লেনদেন সফলভাবে সংরক্ষণ হয়েছে',
                               ),
                             ),
                           );
                         },
-                      ),
-
-                      const SizedBox(height: 15),
-                    ],
-
-                    TextField(
-                      style: TextStyle(
-                        color: textColor,
-                      ),
-                      decoration: InputDecoration(
-                        labelText: 'নোট (ঐচ্ছিক)',
-                        labelStyle: TextStyle(
-                          color: theme.textTheme
-                              .bodySmall
-                              ?.color,
+                        icon: const Icon(
+                          Icons.save_rounded,
                         ),
-                        border:
-                            const OutlineInputBorder(),
-                      ),
-                      onChanged: (value) {
-                        note = value;
-                      },
-                    ),
-
-                    const SizedBox(height: 20),
-
-                    ElevatedButton(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: isDark
-                            ? AppTheme.gold
-                            : AppTheme.darkGreen,
-                        foregroundColor: Colors.white,
-                        minimumSize:
-                            const Size(double.infinity, 45),
-                      ),
-                      onPressed: () async {
-                        if (amount <= 0) return;
-
-                        final newTrans =
-                            MoneyTransaction(
-                          type: type,
-                          amount: amount,
-                          date: DateFormat(
-                            'dd/MM/yyyy',
-                          ).format(DateTime.now()),
-                          category: type == 'Transfer'
-                              ? 'Transfer'
-                              : selectedCategory,
-                          account: type == 'Transfer'
-                              ? '$selectedAccount ➔ $targetAccount'
-                              : selectedAccount,
-                          note: note,
-                        );
-
-                        await MoneyDbHelper.instance
-                            .insertTransaction(
-                          newTrans,
-                        );
-
-                        if (!context.mounted) return;
-
-                        Navigator.pop(ctx);
-                        _loadData();
-                      },
-                      child: const Text(
-                        'Save Transaction',
-                        style: TextStyle(
-                          color: Colors.white,
+                        label: const Text(
+                          'সংরক্ষণ করুন',
+                          style: TextStyle(
+                            fontWeight:
+                                FontWeight.w900,
+                          ),
+                        ),
+                        style:
+                            ElevatedButton.styleFrom(
+                          backgroundColor:
+                              AppTheme.gold,
+                          foregroundColor:
+                              Colors.black,
+                          padding:
+                              const EdgeInsets
+                                  .symmetric(
+                            vertical: 15,
+                          ),
+                          shape:
+                              RoundedRectangleBorder(
+                            borderRadius:
+                                BorderRadius.circular(
+                              15,
+                            ),
+                          ),
                         ),
                       ),
                     ),
-
-                    const SizedBox(height: 20),
                   ],
                 ),
               ),
@@ -1510,74 +1666,132 @@ class _MoneyManagerScreenState extends State<MoneyManagerScreen> {
     );
   }
 
-  // ============================================================
-  // ADD CATEGORY
-  // ============================================================
-
-  void _showAddCategoryDialog(
-    String type,
-    ThemeData theme,
-    VoidCallback onAdded,
+  Widget _typeButton(
+    String title,
+    IconData icon,
+    Color color,
+    bool selected,
+    VoidCallback onTap,
   ) {
-    final newCatController =
+    return InkWell(
+      borderRadius: BorderRadius.circular(13),
+      onTap: onTap,
+      child: Container(
+        padding:
+            const EdgeInsets.symmetric(vertical: 11),
+        decoration: BoxDecoration(
+          color: selected
+              ? color.withValues(alpha: 0.13)
+              : AppTheme.cardColor,
+          borderRadius:
+              BorderRadius.circular(13),
+          border: Border.all(
+            color: selected
+                ? color
+                : AppTheme.textMuted.withValues(
+                    alpha: 0.20,
+                  ),
+          ),
+        ),
+        child: Column(
+          children: [
+            Icon(
+              icon,
+              color: selected
+                  ? color
+                  : AppTheme.textMuted,
+              size: 20,
+            ),
+            const SizedBox(height: 4),
+            Text(
+              title,
+              style: TextStyle(
+                color: selected
+                    ? color
+                    : AppTheme.textMuted,
+                fontSize: 10.5,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<String?> _addCategory(
+    String type,
+  ) async {
+    final controller =
         TextEditingController();
 
-    showDialog(
+    final result =
+        await showDialog<String>(
       context: context,
-      builder: (ctx) {
+      builder: (context) {
         return AlertDialog(
-          backgroundColor: theme.cardColor,
+          backgroundColor:
+              AppTheme.cardColor,
           title: Text(
-            'নতুন ক্যাটাগরি যোগ করুন',
+            'নতুন ক্যাটাগরি',
             style: TextStyle(
-              color:
-                  theme.textTheme.titleLarge?.color,
+              color: AppTheme.textPrimary,
+              fontWeight: FontWeight.w800,
             ),
           ),
           content: TextField(
-            controller: newCatController,
-            style: TextStyle(
-              color:
-                  theme.textTheme.bodyLarge?.color,
-            ),
-            decoration: InputDecoration(
-              hintText: 'ক্যাটাগরির নাম',
-              hintStyle: TextStyle(
-                color: theme.textTheme.bodySmall?.color,
-              ),
-              border:
-                  const OutlineInputBorder(),
+            controller: controller,
+            autofocus: true,
+            decoration:
+                const InputDecoration(
+              hintText:
+                  'ক্যাটাগরির নাম লিখুন',
             ),
           ),
           actions: [
             TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text('Cancel'),
+              onPressed: () {
+                Navigator.pop(context);
+              },
+              child: const Text('বাতিল'),
             ),
             ElevatedButton(
               onPressed: () {
-                final name =
-                    newCatController.text.trim();
+                final value =
+                    controller.text.trim();
 
-                if (name.isNotEmpty) {
-                  setState(() {
-                    if (type == 'Expense') {
-                      _expenseCategories.add(name);
-                    } else if (type == 'Income') {
-                      _incomeCategories.add(name);
-                    }
-                  });
+                if (value.isEmpty) return;
 
-                  onAdded();
-                }
-
-                Navigator.pop(ctx);
+                Navigator.pop(
+                  context,
+                  value,
+                );
               },
-              child: const Text('Add'),
+              child: const Text('যোগ করুন'),
             ),
           ],
         );
       },
     );
+
+    if (result == null || result.isEmpty) {
+      return null;
+    }
+
+    setState(() {
+      if (type == 'Income') {
+        if (!_incomeCategories
+            .contains(result)) {
+          _incomeCategories.add(result);
+        }
+      } else {
+        if (!_expenseCategories
+            .contains(result)) {
+          _expenseCategories.add(result);
+        }
+      }
+    });
+
+    return result;
   }
 }
