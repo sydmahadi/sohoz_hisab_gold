@@ -99,7 +99,6 @@ class _MoneyManagerScreenState extends State<MoneyManagerScreen> {
       } else if (item.type == 'Expense' && item.account == accountName) {
         balance -= item.amount;
       } else if (item.type == 'Transfer') {
-        // Transfer এর ক্ষেত্রে "FromAccount ➔ ToAccount" ফরম্যাট চেক
         if (item.account.startsWith('$accountName ➔')) {
           balance -= item.amount;
         } else if (item.account.endsWith('➔ $accountName')) {
@@ -316,7 +315,7 @@ class _MoneyManagerScreenState extends State<MoneyManagerScreen> {
                                       fontWeight: FontWeight.w600,
                                       fontSize: 15)),
                               subtitle: Text(
-                                item.note.isNotEmpty
+                                (item.note ?? '').isNotEmpty
                                     ? '${item.account} • ${item.note}'
                                     : item.account,
                                 style: const TextStyle(
@@ -726,8 +725,8 @@ class _MoneyManagerScreenState extends State<MoneyManagerScreen> {
   void _showAddTransactionModal(BuildContext context) {
     String type = 'Expense';
     String selectedCategory = _expenseCategories.first;
-    String selectedAccount = _accounts.first; // সিলেক্ট করা মেইন অ্যাকাউন্ট
-    String targetAccount = _accounts.length > 1 ? _accounts[1] : _accounts.first; // Transfer এর জন্য
+    String selectedAccount = _accounts.first;
+    String targetAccount = _accounts.length > 1 ? _accounts[1] : _accounts.first;
     double amount = 0;
     String note = '';
 
@@ -753,7 +752,6 @@ class _MoneyManagerScreenState extends State<MoneyManagerScreen> {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    // Type Selector
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: ['Income', 'Expense', 'Transfer'].map((t) {
@@ -782,7 +780,6 @@ class _MoneyManagerScreenState extends State<MoneyManagerScreen> {
                     ),
                     const SizedBox(height: 15),
 
-                    // Amount Field
                     TextField(
                       keyboardType: TextInputType.number,
                       style: const TextStyle(color: Colors.white),
@@ -795,7 +792,6 @@ class _MoneyManagerScreenState extends State<MoneyManagerScreen> {
                     ),
                     const SizedBox(height: 15),
 
-                    // Account Selection (Income এবং Expense উভয়ের জন্যই দেখাবে)
                     DropdownButtonFormField<String>(
                       value: selectedAccount,
                       dropdownColor: AppTheme.cardColor,
@@ -821,7 +817,6 @@ class _MoneyManagerScreenState extends State<MoneyManagerScreen> {
                     ),
                     const SizedBox(height: 15),
 
-                    // Category Selection Header / Transfer Target
                     if (type == 'Transfer') ...[
                       DropdownButtonFormField<String>(
                         value: targetAccount,
@@ -870,7 +865,6 @@ class _MoneyManagerScreenState extends State<MoneyManagerScreen> {
                       ),
                       const SizedBox(height: 8),
 
-                      // Category Grid
                       GridView.builder(
                         shrinkWrap: true,
                         physics: const NeverScrollableScrollPhysics(),
@@ -910,7 +904,6 @@ class _MoneyManagerScreenState extends State<MoneyManagerScreen> {
                       const SizedBox(height: 15),
                     ],
 
-                    // Note Field
                     TextField(
                       style: const TextStyle(color: Colors.white),
                       decoration: const InputDecoration(
@@ -922,7 +915,6 @@ class _MoneyManagerScreenState extends State<MoneyManagerScreen> {
                     ),
                     const SizedBox(height: 20),
 
-                    // Save Button
                     ElevatedButton(
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.redAccent,
@@ -940,7 +932,7 @@ class _MoneyManagerScreenState extends State<MoneyManagerScreen> {
                           category: type == 'Transfer' ? 'Transfer' : selectedCategory,
                           account: type == 'Transfer'
                               ? '$selectedAccount ➔ $targetAccount'
-                              : selectedAccount, // নির্বাচিত অ্যাকাউন্টের সাথে লিংক হবে
+                              : selectedAccount,
                           note: note,
                         );
 
