@@ -174,6 +174,55 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final bool isDark = AppTheme.isDark;
+
+    // =========================
+    // MODE BASED COLORS
+    // =========================
+
+    final Color screenBackground =
+        AppTheme.background;
+
+    final Color displayBackground =
+        isDark
+            ? AppTheme.cardColor
+            : Colors.white;
+
+    final Color displayInputColor =
+        isDark
+            ? AppTheme.textMuted
+            : const Color(0xFF555555);
+
+    final Color displayResultColor =
+        isDark
+            ? AppTheme.goldLight
+            : const Color(0xFF0F5132);
+
+    final Color numberButtonBackground =
+        isDark
+            ? AppTheme.cardLight
+            : const Color(0xFFF1F3F2);
+
+    final Color numberTextColor =
+        isDark
+            ? AppTheme.textDark
+            : const Color(0xFF17201C);
+
+    final Color operatorButtonBackground =
+        isDark
+            ? AppTheme.primaryLight
+            : const Color(0xFFE4EFEA);
+
+    final Color operatorTextColor =
+        isDark
+            ? AppTheme.goldLight
+            : const Color(0xFF0F5132);
+
+    final Color borderColor =
+        isDark
+            ? AppTheme.gold.withValues(alpha: 0.25)
+            : const Color(0xFFB8C8C0);
+
     final List<String> buttons = [
       'C',
       '÷',
@@ -198,14 +247,20 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
     ];
 
     return Scaffold(
-      backgroundColor: AppTheme.background,
+      backgroundColor: screenBackground,
+
       appBar: AppBar(
         title: const Text('ক্যালকুলেটর'),
       ),
+
       body: SafeArea(
         child: Column(
           children: [
-            // Display section
+
+            // =========================
+            // DISPLAY
+            // =========================
+
             Expanded(
               flex: 3,
               child: Container(
@@ -220,51 +275,79 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
                   horizontal: 20,
                   vertical: 16,
                 ),
+
                 decoration: BoxDecoration(
-                  color: AppTheme.cardColor,
-                  borderRadius: BorderRadius.circular(24),
+                  color: displayBackground,
+                  borderRadius:
+                      BorderRadius.circular(24),
+
                   border: Border.all(
-                    color: AppTheme.gold.withValues(
-                      alpha: 0.5,
-                    ),
+                    color: isDark
+                        ? AppTheme.gold.withValues(
+                            alpha: 0.5,
+                          )
+                        : const Color(0xFFB7C8BE),
                     width: 1,
                   ),
+
                   boxShadow: [
                     BoxShadow(
                       color: Colors.black.withValues(
-                        alpha: 0.3,
+                        alpha: isDark ? 0.3 : 0.10,
                       ),
                       blurRadius: 15,
                       offset: const Offset(0, 8),
                     ),
                   ],
                 ),
+
                 child: Column(
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  crossAxisAlignment: CrossAxisAlignment.end,
+                  mainAxisAlignment:
+                      MainAxisAlignment.end,
+
+                  crossAxisAlignment:
+                      CrossAxisAlignment.end,
+
                   children: [
+
+                    // Input
                     SingleChildScrollView(
-                      scrollDirection: Axis.horizontal,
+                      scrollDirection:
+                          Axis.horizontal,
                       reverse: true,
+
                       child: Text(
-                        _input.isEmpty ? '0' : _input,
+                        _input.isEmpty
+                            ? '0'
+                            : _input,
+
                         style: TextStyle(
-                          color: AppTheme.textMuted,
+                          color:
+                              displayInputColor,
                           fontSize: 26,
-                          fontWeight: FontWeight.w500,
+                          fontWeight:
+                              FontWeight.w500,
                         ),
                       ),
                     ),
+
                     const SizedBox(height: 10),
+
+                    // Result
                     SingleChildScrollView(
-                      scrollDirection: Axis.horizontal,
+                      scrollDirection:
+                          Axis.horizontal,
                       reverse: true,
+
                       child: Text(
                         _result,
+
                         style: TextStyle(
-                          color: AppTheme.goldLight,
+                          color:
+                              displayResultColor,
                           fontSize: 40,
-                          fontWeight: FontWeight.bold,
+                          fontWeight:
+                              FontWeight.bold,
                         ),
                       ),
                     ),
@@ -273,20 +356,28 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
               ),
             ),
 
-            // Keypad section
+            // =========================
+            // KEYPAD
+            // =========================
+
             Expanded(
               flex: 6,
+
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(
+                padding:
+                    const EdgeInsets.fromLTRB(
                   16,
                   0,
                   16,
                   16,
                 ),
+
                 child: GridView.builder(
                   physics:
                       const NeverScrollableScrollPhysics(),
+
                   itemCount: buttons.length,
+
                   gridDelegate:
                       const SliverGridDelegateWithFixedCrossAxisCount(
                     crossAxisCount: 4,
@@ -294,10 +385,14 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
                     mainAxisSpacing: 10,
                     childAspectRatio: 1.15,
                   ),
-                  itemBuilder: (context, index) {
-                    final btn = buttons[index];
 
-                    final isOperator = [
+                  itemBuilder:
+                      (context, index) {
+
+                    final String btn =
+                        buttons[index];
+
+                    final bool isOperator = [
                       '÷',
                       '×',
                       '-',
@@ -305,63 +400,141 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
                       '%',
                     ].contains(btn);
 
-                    final isEqual = btn == '=';
-                    final isClear = [
+                    final bool isEqual =
+                        btn == '=';
+
+                    final bool isClear = [
                       'C',
                       '⌫',
                     ].contains(btn);
 
-                    Color btnBg = AppTheme.cardLight;
-                    Color textColor = AppTheme.textDark;
+                    Color btnBg =
+                        numberButtonBackground;
+
+                    Color textColor =
+                        numberTextColor;
+
+                    Color btnBorder =
+                        borderColor;
+
+                    // =====================
+                    // EQUAL BUTTON
+                    // =====================
 
                     if (isEqual) {
                       btnBg = AppTheme.gold;
                       textColor = Colors.black;
-                    } else if (isOperator) {
-                      btnBg = AppTheme.primaryLight;
-                      textColor = AppTheme.goldLight;
-                    } else if (isClear) {
-                      btnBg = AppTheme.danger.withValues(
-                        alpha: 0.85,
-                      );
-                      textColor = Colors.white;
+                      btnBorder =
+                          AppTheme.gold;
+                    }
+
+                    // =====================
+                    // OPERATOR BUTTON
+                    // =====================
+
+                    else if (isOperator) {
+                      btnBg =
+                          operatorButtonBackground;
+                      textColor =
+                          operatorTextColor;
+                      btnBorder =
+                          isDark
+                              ? AppTheme.gold
+                              : const Color(
+                                  0xFF8EAF9F,
+                                );
+                    }
+
+                    // =====================
+                    // CLEAR BUTTON
+                    // =====================
+
+                    else if (isClear) {
+                      btnBg = isDark
+                          ? AppTheme.danger
+                              .withValues(
+                              alpha: 0.85,
+                            )
+                          : const Color(
+                              0xFFFFE6E4,
+                            );
+
+                      textColor = isDark
+                          ? Colors.white
+                          : const Color(
+                              0xFFB3261E,
+                            );
+
+                      btnBorder = isDark
+                          ? AppTheme.danger
+                          : const Color(
+                              0xFFE0AAA6,
+                            );
                     }
 
                     return Material(
                       color: Colors.transparent,
-                      borderRadius: BorderRadius.circular(16),
+
+                      borderRadius:
+                          BorderRadius.circular(16),
+
                       child: InkWell(
                         onTap: () =>
                             _onButtonPressed(btn),
+
                         borderRadius:
                             BorderRadius.circular(16),
+
                         splashColor:
-                            AppTheme.gold.withValues(
+                            AppTheme.gold
+                                .withValues(
                           alpha: 0.25,
                         ),
+
                         child: Ink(
-                          decoration: BoxDecoration(
+                          decoration:
+                              BoxDecoration(
                             color: btnBg,
+
                             borderRadius:
-                                BorderRadius.circular(16),
+                                BorderRadius
+                                    .circular(16),
+
                             border: Border.all(
-                              color: isOperator || isEqual
-                                  ? AppTheme.gold
-                                  : AppTheme.gold.withValues(
-                                      alpha: 0.25,
-                                    ),
-                              width: isOperator || isEqual
-                                  ? 1
-                                  : 0.6,
+                              color: btnBorder,
+                              width:
+                                  isOperator ||
+                                          isEqual
+                                      ? 1
+                                      : 0.6,
                             ),
+
+                            boxShadow: [
+                              if (!isDark)
+                                BoxShadow(
+                                  color: Colors.black
+                                      .withValues(
+                                    alpha: 0.06,
+                                  ),
+                                  blurRadius: 5,
+                                  offset:
+                                      const Offset(
+                                    0,
+                                    3,
+                                  ),
+                                ),
+                            ],
                           ),
+
                           child: Center(
                             child: Text(
                               btn,
+
                               style: TextStyle(
                                 color: textColor,
                                 fontSize: 22,
-                                fontWeight: FontWeight.bold,
+                                fontWeight:
+                                    FontWeight.bold,
                               ),
                             ),
                           ),
