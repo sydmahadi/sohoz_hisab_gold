@@ -15,8 +15,7 @@ class ReportScreen extends StatefulWidget {
   const ReportScreen({super.key});
 
   @override
-  State<ReportScreen> createState() =>
-      _ReportScreenState();
+  State<ReportScreen> createState() => _ReportScreenState();
 }
 
 class _ReportScreenState extends State<ReportScreen> {
@@ -46,8 +45,7 @@ class _ReportScreenState extends State<ReportScreen> {
       _loading = true;
     });
 
-    final data =
-        await MoneyDbHelper.instance.getAllTransactions();
+    final data = await MoneyDbHelper.instance.getAllTransactions();
 
     if (!mounted) return;
 
@@ -134,8 +132,7 @@ class _ReportScreenState extends State<ReportScreen> {
   }
 
   Map<String, double> get _incomeCategories {
-    final result =
-        _categoryTotals(_incomeTransactions);
+    final result = _categoryTotals(_incomeTransactions);
 
     final entries = result.entries.toList()
       ..sort(
@@ -146,8 +143,7 @@ class _ReportScreenState extends State<ReportScreen> {
   }
 
   Map<String, double> get _expenseCategories {
-    final result =
-        _categoryTotals(_expenseTransactions);
+    final result = _categoryTotals(_expenseTransactions);
 
     final entries = result.entries.toList()
       ..sort(
@@ -214,11 +210,6 @@ class _ReportScreenState extends State<ReportScreen> {
     final income = _incomeCategories.entries.toList();
     final expense = _expenseCategories.entries.toList();
 
-    final int maxRows =
-        income.length > expense.length
-            ? income.length
-            : expense.length;
-
     return Container(
       width: 794,
       color: Colors.white,
@@ -229,13 +220,8 @@ class _ReportScreenState extends State<ReportScreen> {
           fontFamily: 'Arial',
         ),
         child: Column(
-          crossAxisAlignment:
-              CrossAxisAlignment.stretch,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // ------------------------------------------------
-            // HEADER
-            // ------------------------------------------------
-
             const Text(
               'সহজ হিসাব গোল্ড',
               textAlign: TextAlign.center,
@@ -271,27 +257,17 @@ class _ReportScreenState extends State<ReportScreen> {
 
             const SizedBox(height: 25),
 
-            // ------------------------------------------------
-            // LEFT INCOME + RIGHT EXPENSE
-            // ------------------------------------------------
-
             Container(
               decoration: BoxDecoration(
                 border: Border.all(
                   color: Colors.black54,
                   width: 1,
                 ),
-                borderRadius:
-                    BorderRadius.circular(8),
+                borderRadius: BorderRadius.circular(8),
               ),
               child: Row(
-                crossAxisAlignment:
-                    CrossAxisAlignment.start,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // ==============================
-                  // LEFT - INCOME
-                  // ==============================
-
                   Expanded(
                     child: _buildA4Side(
                       title: 'আয়',
@@ -304,10 +280,6 @@ class _ReportScreenState extends State<ReportScreen> {
                     width: 1,
                     color: Colors.black54,
                   ),
-
-                  // ==============================
-                  // RIGHT - EXPENSE
-                  // ==============================
 
                   Expanded(
                     child: _buildA4Side(
@@ -322,13 +294,8 @@ class _ReportScreenState extends State<ReportScreen> {
 
             const SizedBox(height: 22),
 
-            // ------------------------------------------------
-            // BALANCE
-            // ------------------------------------------------
-
             Container(
-              padding:
-                  const EdgeInsets.symmetric(
+              padding: const EdgeInsets.symmetric(
                 vertical: 16,
                 horizontal: 20,
               ),
@@ -339,22 +306,18 @@ class _ReportScreenState extends State<ReportScreen> {
                       : Colors.red.shade700,
                   width: 1.2,
                 ),
-                borderRadius:
-                    BorderRadius.circular(8),
+                borderRadius: BorderRadius.circular(8),
               ),
               child: Column(
                 children: [
                   Text(
-                    _balance >= 0
-                        ? 'উদ্বৃত্ত'
-                        : 'ঘাটতি',
+                    _balance >= 0 ? 'উদ্বৃত্ত' : 'ঘাটতি',
                     style: TextStyle(
                       color: _balance >= 0
                           ? Colors.green.shade800
                           : Colors.red.shade800,
                       fontSize: 18,
-                      fontWeight:
-                          FontWeight.w900,
+                      fontWeight: FontWeight.w900,
                     ),
                   ),
 
@@ -367,8 +330,7 @@ class _ReportScreenState extends State<ReportScreen> {
                           ? Colors.green.shade800
                           : Colors.red.shade800,
                       fontSize: 25,
-                      fontWeight:
-                          FontWeight.w900,
+                      fontWeight: FontWeight.w900,
                     ),
                   ),
                 ],
@@ -376,10 +338,6 @@ class _ReportScreenState extends State<ReportScreen> {
             ),
 
             const SizedBox(height: 15),
-
-            // ------------------------------------------------
-            // TRANSACTION COUNT
-            // ------------------------------------------------
 
             Text(
               'মোট লেনদেন: ${_monthlyTransactions.length} টি',
@@ -397,19 +355,14 @@ class _ReportScreenState extends State<ReportScreen> {
 
   Widget _buildA4Side({
     required String title,
-    required List<
-            MapEntry<String, double>>
-        items,
+    required List<MapEntry<String, double>> items,
     required double total,
   }) {
     return Column(
-      crossAxisAlignment:
-          CrossAxisAlignment.stretch,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        // Header
         Container(
-          padding:
-              const EdgeInsets.symmetric(
+          padding: const EdgeInsets.symmetric(
             vertical: 11,
           ),
           color: const Color(0xFFEFEFEF),
@@ -423,7 +376,6 @@ class _ReportScreenState extends State<ReportScreen> {
           ),
         ),
 
-        // Empty
         if (items.isEmpty)
           const Padding(
             padding: EdgeInsets.all(20),
@@ -436,20 +388,17 @@ class _ReportScreenState extends State<ReportScreen> {
             ),
           ),
 
-        // Rows
         ...items.asMap().entries.map(
           (entry) {
             final index = entry.key;
             final item = entry.value;
 
             return Container(
-              padding:
-                  const EdgeInsets.symmetric(
+              padding: const EdgeInsets.symmetric(
                 horizontal: 10,
                 vertical: 9,
               ),
-              decoration:
-                  const BoxDecoration(
+              decoration: const BoxDecoration(
                 border: Border(
                   bottom: BorderSide(
                     color: Colors.black12,
@@ -462,11 +411,9 @@ class _ReportScreenState extends State<ReportScreen> {
                     width: 22,
                     child: Text(
                       '${index + 1}.',
-                      style:
-                          const TextStyle(
+                      style: const TextStyle(
                         fontSize: 11,
-                        fontWeight:
-                            FontWeight.w700,
+                        fontWeight: FontWeight.w700,
                       ),
                     ),
                   ),
@@ -474,11 +421,9 @@ class _ReportScreenState extends State<ReportScreen> {
                   Expanded(
                     child: Text(
                       item.key,
-                      style:
-                          const TextStyle(
+                      style: const TextStyle(
                         fontSize: 12,
-                        fontWeight:
-                            FontWeight.w600,
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
                   ),
@@ -487,13 +432,10 @@ class _ReportScreenState extends State<ReportScreen> {
 
                   Text(
                     _money(item.value),
-                    textAlign:
-                        TextAlign.right,
-                    style:
-                        const TextStyle(
+                    textAlign: TextAlign.right,
+                    style: const TextStyle(
                       fontSize: 11.5,
-                      fontWeight:
-                          FontWeight.w800,
+                      fontWeight: FontWeight.w800,
                     ),
                   ),
                 ],
@@ -502,10 +444,8 @@ class _ReportScreenState extends State<ReportScreen> {
           },
         ),
 
-        // Total
         Container(
-          padding:
-              const EdgeInsets.symmetric(
+          padding: const EdgeInsets.symmetric(
             horizontal: 10,
             vertical: 12,
           ),
@@ -517,8 +457,7 @@ class _ReportScreenState extends State<ReportScreen> {
                   'মোট',
                   style: TextStyle(
                     fontSize: 13,
-                    fontWeight:
-                        FontWeight.w900,
+                    fontWeight: FontWeight.w900,
                   ),
                 ),
               ),
@@ -526,8 +465,7 @@ class _ReportScreenState extends State<ReportScreen> {
                 _money(total),
                 style: const TextStyle(
                   fontSize: 13,
-                  fontWeight:
-                      FontWeight.w900,
+                  fontWeight: FontWeight.w900,
                 ),
               ),
             ],
@@ -543,8 +481,7 @@ class _ReportScreenState extends State<ReportScreen> {
 
   Future<Uint8List> _captureA4Image() async {
     final image =
-        await _screenshotController
-            .captureFromLongWidget(
+        await _screenshotController.captureFromLongWidget(
       InheritedTheme.captureAll(
         context,
         Material(
@@ -552,8 +489,7 @@ class _ReportScreenState extends State<ReportScreen> {
           child: _buildA4Report(),
         ),
       ),
-      delay:
-          const Duration(milliseconds: 500),
+      delay: const Duration(milliseconds: 500),
       context: context,
       pixelRatio: 2,
       constraints: const BoxConstraints(
@@ -565,7 +501,7 @@ class _ReportScreenState extends State<ReportScreen> {
   }
 
   // ============================================================
-  // SAVE IMAGE TO GALLERY
+  // SAVE IMAGE
   // ============================================================
 
   Future<void> _saveAsImage() async {
@@ -576,11 +512,9 @@ class _ReportScreenState extends State<ReportScreen> {
     });
 
     try {
-      final Uint8List image =
-          await _captureA4Image();
+      final Uint8List image = await _captureA4Image();
 
-      final permission =
-          await Gal.requestAccess(
+      final permission = await Gal.requestAccess(
         toAlbum: true,
       );
 
@@ -590,21 +524,19 @@ class _ReportScreenState extends State<ReportScreen> {
         );
       }
 
-      final month =
-          DateFormat('MM-yyyy')
-              .format(_selectedMonth);
+      final month = DateFormat('MM-yyyy').format(
+        _selectedMonth,
+      );
 
       await Gal.putImageBytes(
         image,
         album: 'সহজ হিসাব গোল্ড',
-        name:
-            'Shohoj_Hisab_Report_$month',
+        name: 'Shohoj_Hisab_Report_$month',
       );
 
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context)
-          .showSnackBar(
+      ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text(
             'রিপোর্টটি Gallery-তে Save হয়েছে',
@@ -614,8 +546,7 @@ class _ReportScreenState extends State<ReportScreen> {
     } catch (e) {
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context)
-          .showSnackBar(
+      ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
             'Image Save করা যায়নি\n$e',
@@ -643,13 +574,10 @@ class _ReportScreenState extends State<ReportScreen> {
     });
 
     try {
-      final Uint8List image =
-          await _captureA4Image();
+      final Uint8List image = await _captureA4Image();
 
       final pdf = pw.Document();
-
-      final pdfImage =
-          pw.MemoryImage(image);
+      final pdfImage = pw.MemoryImage(image);
 
       pdf.addPage(
         pw.Page(
@@ -664,20 +592,18 @@ class _ReportScreenState extends State<ReportScreen> {
         ),
       );
 
-      final month =
-          DateFormat('MM-yyyy')
-              .format(_selectedMonth);
+      final month = DateFormat('MM-yyyy').format(
+        _selectedMonth,
+      );
 
       await Printing.sharePdf(
         bytes: await pdf.save(),
-        filename:
-            'Shohoj_Hisab_Report_$month.pdf',
+        filename: 'Shohoj_Hisab_Report_$month.pdf',
       );
 
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context)
-          .showSnackBar(
+      ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text(
             'A4 PDF তৈরি হয়েছে',
@@ -687,8 +613,7 @@ class _ReportScreenState extends State<ReportScreen> {
     } catch (e) {
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context)
-          .showSnackBar(
+      ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
             'PDF তৈরি করা যায়নি\n$e',
@@ -710,12 +635,10 @@ class _ReportScreenState extends State<ReportScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     final dark = AppTheme.isDark;
 
     return Scaffold(
-      backgroundColor:
-          AppTheme.background,
+      backgroundColor: AppTheme.background,
 
       appBar: AppBar(
         title: Text(
@@ -724,8 +647,7 @@ class _ReportScreenState extends State<ReportScreen> {
             color: dark
                 ? AppTheme.gold
                 : AppTheme.darkGreen,
-            fontWeight:
-                FontWeight.w800,
+            fontWeight: FontWeight.w800,
           ),
         ),
         actions: [
@@ -744,8 +666,7 @@ class _ReportScreenState extends State<ReportScreen> {
 
       body: _loading
           ? Center(
-              child:
-                  CircularProgressIndicator(
+              child: CircularProgressIndicator(
                 color: dark
                     ? AppTheme.gold
                     : AppTheme.darkGreen,
@@ -756,125 +677,84 @@ class _ReportScreenState extends State<ReportScreen> {
               color: dark
                   ? AppTheme.gold
                   : AppTheme.darkGreen,
-              child:
-                  SingleChildScrollView(
+              child: SingleChildScrollView(
                 physics:
                     const AlwaysScrollableScrollPhysics(),
-                padding:
-                    const EdgeInsets.fromLTRB(
+                padding: const EdgeInsets.fromLTRB(
                   14,
                   10,
                   14,
-                  30,
+                  10,
                 ),
                 child: Column(
                   children: [
-                    // ========================================
-                    // MONTH SELECTOR
-                    // ========================================
-
                     _buildMonthSelector(
-                      theme,
+                      Theme.of(context),
                       dark,
                     ),
 
-                    const SizedBox(
-                      height: 16,
-                    ),
-
-                    // ========================================
-                    // LIVE PREVIEW
-                    // ========================================
+                    const SizedBox(height: 16),
 
                     Container(
-                      width:
-                          double.infinity,
-                      padding:
-                          const EdgeInsets
-                              .all(8),
-                      decoration:
-                          BoxDecoration(
-                        color:
-                            Colors.grey.shade200,
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade200,
                         borderRadius:
-                            BorderRadius
-                                .circular(12),
+                            BorderRadius.circular(12),
                       ),
-                      child:
-                          FittedBox(
-                        fit:
-                            BoxFit.fitWidth,
-                        alignment:
-                            Alignment.topCenter,
+                      child: FittedBox(
+                        fit: BoxFit.fitWidth,
+                        alignment: Alignment.topCenter,
                         child: Screenshot(
                           controller:
                               _screenshotController,
-                          child:
-                              _buildA4Report(),
+                          child: _buildA4Report(),
                         ),
                       ),
                     ),
 
-                    const SizedBox(
-                      height: 18,
-                    ),
-
-                    // ========================================
-                    // SAVE BUTTONS
-                    // ========================================
+                    const SizedBox(height: 18),
 
                     Row(
                       children: [
                         Expanded(
-                          child:
-                              ElevatedButton.icon(
-                            onPressed:
-                                _savingImage
-                                    ? null
-                                    : _saveAsImage,
+                          child: ElevatedButton.icon(
+                            onPressed: _savingImage
+                                ? null
+                                : _saveAsImage,
                             icon: _savingImage
                                 ? const SizedBox(
                                     width: 18,
                                     height: 18,
                                     child:
                                         CircularProgressIndicator(
-                                      strokeWidth:
-                                          2,
+                                      strokeWidth: 2,
                                     ),
                                   )
                                 : const Icon(
                                     Icons
                                         .image_outlined,
                                   ),
-                            label:
-                                const Text(
+                            label: const Text(
                               'Save as Image',
                             ),
                             style:
-                                ElevatedButton
-                                    .styleFrom(
+                                ElevatedButton.styleFrom(
                               padding:
-                                  const EdgeInsets
-                                      .symmetric(
+                                  const EdgeInsets.symmetric(
                                 vertical: 15,
                               ),
-                              backgroundColor:
-                                  dark
-                                      ? AppTheme
-                                          .gold
-                                      : AppTheme
-                                          .darkGreen,
-                              foregroundColor:
-                                  dark
-                                      ? Colors
-                                          .black
-                                      : Colors
-                                          .white,
+                              backgroundColor: dark
+                                  ? AppTheme.gold
+                                  : AppTheme.darkGreen,
+                              foregroundColor: dark
+                                  ? Colors.black
+                                  : Colors.white,
                               shape:
                                   RoundedRectangleBorder(
                                 borderRadius:
-                                    BorderRadius
-                                        .circular(
+                                    BorderRadius.circular(
                                   14,
                                 ),
                               ),
@@ -882,53 +762,43 @@ class _ReportScreenState extends State<ReportScreen> {
                           ),
                         ),
 
-                        const SizedBox(
-                          width: 10,
-                        ),
+                        const SizedBox(width: 10),
 
                         Expanded(
-                          child:
-                              ElevatedButton.icon(
-                            onPressed:
-                                _savingPdf
-                                    ? null
-                                    : _saveAsPdf,
+                          child: ElevatedButton.icon(
+                            onPressed: _savingPdf
+                                ? null
+                                : _saveAsPdf,
                             icon: _savingPdf
                                 ? const SizedBox(
                                     width: 18,
                                     height: 18,
                                     child:
                                         CircularProgressIndicator(
-                                      strokeWidth:
-                                          2,
+                                      strokeWidth: 2,
                                     ),
                                   )
                                 : const Icon(
                                     Icons
                                         .picture_as_pdf_outlined,
                                   ),
-                            label:
-                                const Text(
+                            label: const Text(
                               'Save as PDF',
                             ),
                             style:
-                                ElevatedButton
-                                    .styleFrom(
+                                ElevatedButton.styleFrom(
                               padding:
-                                  const EdgeInsets
-                                      .symmetric(
+                                  const EdgeInsets.symmetric(
                                 vertical: 15,
                               ),
                               backgroundColor:
-                                  Colors
-                                      .redAccent,
+                                  Colors.redAccent,
                               foregroundColor:
                                   Colors.white,
                               shape:
                                   RoundedRectangleBorder(
                                 borderRadius:
-                                    BorderRadius
-                                        .circular(
+                                    BorderRadius.circular(
                                   14,
                                 ),
                               ),
@@ -938,16 +808,65 @@ class _ReportScreenState extends State<ReportScreen> {
                       ],
                     ),
 
-                    const SizedBox(
-                      height: 8,
-                    ),
+                    const SizedBox(height: 6),
 
                     Text(
                       'Image: A4 • Gallery-তে Save হবে',
                       style: TextStyle(
-                        color:
-                            AppTheme.textMuted,
+                        color: AppTheme.textMuted,
                         fontSize: 11,
+                      ),
+                    ),
+
+                    const SizedBox(height: 8),
+
+                    // ========================================
+                    // SMALL FOOTER
+                    // ========================================
+
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: Padding(
+                        padding: const EdgeInsets.only(
+                          right: 2,
+                          top: 4,
+                          bottom: 2,
+                        ),
+                        child: Opacity(
+                          opacity: 0.45,
+                          child: Column(
+                            crossAxisAlignment:
+                                CrossAxisAlignment.end,
+                            children: [
+                              Text(
+                                'সহজ হিসাব গোল্ড',
+                                style: TextStyle(
+                                  color:
+                                      AppTheme.textMuted,
+                                  fontSize: 9,
+                                  fontWeight:
+                                      FontWeight.w600,
+                                ),
+                              ),
+                              Text(
+                                'Develop by Sayeed Mahadi',
+                                style: TextStyle(
+                                  color:
+                                      AppTheme.textMuted,
+                                  fontSize: 8,
+                                ),
+                              ),
+                              Text(
+                                'mahadisayeed@gmail.com',
+                                style: TextStyle(
+                                  color:
+                                      AppTheme.textMuted,
+                                  fontSize: 8,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
                       ),
                     ),
                   ],
@@ -966,19 +885,16 @@ class _ReportScreenState extends State<ReportScreen> {
     bool dark,
   ) {
     return Container(
-      padding:
-          const EdgeInsets.symmetric(
+      padding: const EdgeInsets.symmetric(
         horizontal: 6,
         vertical: 8,
       ),
       decoration: BoxDecoration(
         color: AppTheme.cardColor,
-        borderRadius:
-            BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(18),
         border: Border.all(
           color: AppTheme.gold.withValues(
-            alpha:
-                dark ? 0.35 : 0.25,
+            alpha: dark ? 0.35 : 0.25,
           ),
         ),
       ),
@@ -998,14 +914,10 @@ class _ReportScreenState extends State<ReportScreen> {
           Expanded(
             child: InkWell(
               borderRadius:
-                  BorderRadius.circular(
-                12,
-              ),
+                  BorderRadius.circular(12),
               onTap: _selectMonth,
               child: Padding(
-                padding:
-                    const EdgeInsets
-                        .symmetric(
+                padding: const EdgeInsets.symmetric(
                   vertical: 5,
                 ),
                 child: Column(
@@ -1013,47 +925,32 @@ class _ReportScreenState extends State<ReportScreen> {
                     Text(
                       'রিপোর্টের মাস',
                       style: TextStyle(
-                        color:
-                            AppTheme
-                                .textMuted,
+                        color: AppTheme.textMuted,
                         fontSize: 11,
-                        fontWeight:
-                            FontWeight.w600,
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
 
-                    const SizedBox(
-                      height: 3,
-                    ),
+                    const SizedBox(height: 3),
 
                     Text(
-                      DateFormat(
-                        'MMMM yyyy',
-                      ).format(
+                      DateFormat('MMMM yyyy').format(
                         _selectedMonth,
                       ),
-                      textAlign:
-                          TextAlign.center,
+                      textAlign: TextAlign.center,
                       style: TextStyle(
-                        color:
-                            AppTheme
-                                .textPrimary,
+                        color: AppTheme.textPrimary,
                         fontSize: 18,
-                        fontWeight:
-                            FontWeight.w800,
+                        fontWeight: FontWeight.w800,
                       ),
                     ),
 
-                    const SizedBox(
-                      height: 2,
-                    ),
+                    const SizedBox(height: 2),
 
                     Text(
                       'মাস পরিবর্তন করতে চাপ দিন',
                       style: TextStyle(
-                        color:
-                            AppTheme
-                                .textMuted,
+                        color: AppTheme.textMuted,
                         fontSize: 9,
                       ),
                     ),
