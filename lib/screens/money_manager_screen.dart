@@ -19,7 +19,6 @@ class _MoneyManagerScreenState
     extends State<MoneyManagerScreen> {
   int _currentIndex = 0;
   int _statsTab = 1;
-
   String _filterType = 'Monthly';
 
   List<MoneyTransaction> _transactions = [];
@@ -101,7 +100,7 @@ class _MoneyManagerScreenState
   }
 
   // ============================================================
-  // LOAD DATA
+  // LOAD TRANSACTIONS
   // ============================================================
 
   Future<void> _loadTransactions() async {
@@ -122,6 +121,10 @@ class _MoneyManagerScreenState
       });
     }
   }
+
+  // ============================================================
+  // LOAD CATEGORIES
+  // ============================================================
 
   Future<void> _loadCategories() async {
     try {
@@ -151,12 +154,12 @@ class _MoneyManagerScreenState
         _expenseCategories = expense;
       });
     } catch (_) {
-      // Default categories already loaded.
+      // Default categories remain available.
     }
   }
 
   // ============================================================
-  // DATE PARSE
+  // DATE PARSER
   // ============================================================
 
   DateTime? _parseDate(String value) {
@@ -168,7 +171,7 @@ class _MoneyManagerScreenState
   }
 
   // ============================================================
-  // FILTER
+  // FILTERED TRANSACTIONS
   // ============================================================
 
   List<MoneyTransaction> get _filteredTransactions {
@@ -241,7 +244,7 @@ class _MoneyManagerScreenState
   double get _balance => _totalIncome - _totalExpense;
 
   // ============================================================
-  // CATEGORY TOTAL
+  // CATEGORY TOTALS
   // ============================================================
 
   Map<String, double> _categoryTotals(String type) {
@@ -279,8 +282,7 @@ class _MoneyManagerScreenState
       }
 
       if (transaction.type == 'Transfer') {
-        final parts =
-            transaction.account.split('➔');
+        final parts = transaction.account.split('➔');
 
         if (parts.length == 2) {
           final from = parts[0].trim();
@@ -301,7 +303,7 @@ class _MoneyManagerScreenState
   }
 
   // ============================================================
-  // ADD TRANSACTION
+  // OPEN ADD TRANSACTION
   // ============================================================
 
   Future<void> _openAddTransaction() async {
@@ -309,7 +311,7 @@ class _MoneyManagerScreenState
 
     if (!mounted) return;
 
-    await showModalBottomSheet(
+    final saved = await showModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
@@ -320,19 +322,35 @@ class _MoneyManagerScreenState
           incomeCategories: _incomeCategories,
           expenseCategories: _expenseCategories,
           accounts: _accounts,
-          onSaved: _loadTransactions,
         );
       },
     );
 
     if (!mounted) return;
 
-    await _loadCategories();
-    await _loadTransactions();
+    if (saved == true) {
+      await _loadCategories();
+      await _loadTransactions();
+
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context)
+          .hideCurrentSnackBar();
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'লেনদেন সফলভাবে সংরক্ষণ হয়েছে',
+          ),
+          behavior: SnackBarBehavior.floating,
+          duration: Duration(seconds: 2),
+        ),
+      );
+    }
   }
 
   // ============================================================
-  // DELETE
+  // DELETE TRANSACTION
   // ============================================================
 
   Future<void> _confirmDeleteTransaction(
@@ -412,13 +430,11 @@ class _MoneyManagerScreenState
   }
 
   // ============================================================
-  // BUILD
+  // MAIN BUILD
   // ============================================================
 
   @override
   Widget build(BuildContext context) {
-    final dark = AppTheme.isDark;
-
     final pages = [
       _buildTransactionView(),
       _buildStatsView(),
@@ -432,7 +448,7 @@ class _MoneyManagerScreenState
         title: Text(
           'মানি ম্যানেজার',
           style: TextStyle(
-            color: dark
+            color: AppTheme.isDark
                 ? AppTheme.gold
                 : AppTheme.darkGreen,
             fontWeight: FontWeight.w800,
@@ -446,7 +462,7 @@ class _MoneyManagerScreenState
             },
             icon: Icon(
               Icons.refresh_rounded,
-              color: dark
+              color: AppTheme.isDark
                   ? AppTheme.gold
                   : AppTheme.darkGreen,
             ),
@@ -655,8 +671,9 @@ class _MoneyManagerScreenState
           });
         },
         child: AnimatedContainer(
-          duration:
-              const Duration(milliseconds: 180),
+          duration: const Duration(
+            milliseconds: 180,
+          ),
           padding: const EdgeInsets.symmetric(
             vertical: 10,
             horizontal: 3,
@@ -836,8 +853,10 @@ class _MoneyManagerScreenState
   ) {
     final income =
         transaction.type == 'Income';
+
     final expense =
         transaction.type == 'Expense';
+
     final transfer =
         transaction.type == 'Transfer';
 
@@ -985,7 +1004,7 @@ class _MoneyManagerScreenState
   }
 
   // ============================================================
-  // STATS
+  // STATS VIEW
   // ============================================================
 
   Widget _buildStatsView() {
@@ -1335,7 +1354,7 @@ class _MoneyManagerScreenState
   }
 
   // ============================================================
-  // STATS TAB BUTTON
+  // STATS TAB
   // ============================================================
 
   Widget _statsTabButton(
@@ -1708,13 +1727,11 @@ class _TransactionSheet
   final List<String> incomeCategories;
   final List<String> expenseCategories;
   final List<String> accounts;
-  final Future<void> Function() onSaved;
 
   const _TransactionSheet({
     required this.incomeCategories,
     required this.expenseCategories,
     required this.accounts,
-    required this.onSaved,
   });
 
   @override
@@ -1794,13 +1811,11 @@ class _TransactionSheetState
   }
 
   // ============================================================
-  // DATE
+  // DATE PICKER
   // ============================================================
 
-  Future<void>
-      _selectTransactionDate() async {
-    final picked =
-        await showDatePicker(
+  Future<void> _selectTransactionDate() async {
+    final picked = await showDatePicker(
       context: context,
       initialDate: _selectedDate,
       firstDate: DateTime(2020),
@@ -1811,8 +1826,7 @@ class _TransactionSheetState
       confirmText: 'নির্বাচন',
     );
 
-    if (picked == null ||
-        !mounted) {
+    if (picked == null || !mounted) {
       return;
     }
 
@@ -1829,61 +1843,48 @@ class _TransactionSheetState
     final controller =
         TextEditingController();
 
-    final value =
-        await showDialog<String>(
+    final value = await showDialog<String>(
       context: context,
       builder: (dialogContext) {
         return AlertDialog(
-          backgroundColor:
-              AppTheme.cardColor,
+          backgroundColor: AppTheme.cardColor,
           title: Text(
             _type == 'Income'
                 ? 'নতুন আয় খাত যোগ করুন'
                 : 'নতুন খরচের খাত যোগ করুন',
             style: TextStyle(
-              color:
-                  AppTheme.textPrimary,
-              fontWeight:
-                  FontWeight.w800,
+              color: AppTheme.textPrimary,
+              fontWeight: FontWeight.w800,
             ),
           ),
           content: TextField(
             controller: controller,
             autofocus: true,
             style: TextStyle(
-              color:
-                  AppTheme.textPrimary,
+              color: AppTheme.textPrimary,
             ),
-            decoration:
-                const InputDecoration(
-              hintText:
-                  'খাতের নাম লিখুন',
+            decoration: const InputDecoration(
+              hintText: 'খাতের নাম লিখুন',
             ),
           ),
           actions: [
             TextButton(
               onPressed: () {
-                Navigator.of(
-                  dialogContext,
-                ).pop();
+                Navigator.of(dialogContext).pop();
               },
-              child:
-                  const Text('বাতিল'),
+              child: const Text('বাতিল'),
             ),
             ElevatedButton(
               onPressed: () {
                 final text =
-                    controller.text
-                        .trim();
+                    controller.text.trim();
 
                 if (text.isEmpty) return;
 
-                Navigator.of(
-                  dialogContext,
-                ).pop(text);
+                Navigator.of(dialogContext)
+                    .pop(text);
               },
-              child:
-                  const Text('যোগ করুন'),
+              child: const Text('যোগ করুন'),
             ),
           ],
         );
@@ -1898,8 +1899,7 @@ class _TransactionSheetState
       return;
     }
 
-    final category =
-        value.trim();
+    final category = value.trim();
 
     final current =
         _type == 'Income'
@@ -1913,39 +1913,25 @@ class _TransactionSheetState
     );
 
     if (exists) {
-      ScaffoldMessenger.of(context)
-          .showSnackBar(
-        const SnackBar(
-          content: Text(
-            'এই খাতটি আগে থেকেই আছে',
-          ),
-          behavior:
-              SnackBarBehavior.floating,
-        ),
+      _showMessage(
+        'এই খাতটি আগে থেকেই আছে',
       );
-
       return;
     }
 
     setState(() {
       if (_type == 'Income') {
-        _incomeCategories.add(
-          category,
-        );
+        _incomeCategories.add(category);
       } else {
-        _expenseCategories.add(
-          category,
-        );
+        _expenseCategories.add(category);
       }
 
-      _selectedCategory =
-          category;
+      _selectedCategory = category;
     });
 
     try {
       final prefs =
-          await SharedPreferences
-              .getInstance();
+          await SharedPreferences.getInstance();
 
       if (_type == 'Income') {
         final customIncome =
@@ -1978,26 +1964,17 @@ class _TransactionSheetState
           customExpense,
         );
       }
-    } catch (_) {
-      // Category is still available in current sheet.
-    }
+    } catch (_) {}
 
     if (!mounted) return;
 
-    ScaffoldMessenger.of(context)
-        .showSnackBar(
-      SnackBar(
-        content: Text(
-          '“$category” খাত যোগ হয়েছে',
-        ),
-        behavior:
-            SnackBarBehavior.floating,
-      ),
+    _showMessage(
+      '“$category” খাত যোগ হয়েছে',
     );
   }
 
   // ============================================================
-  // SAVE
+  // SAVE TRANSACTION
   // ============================================================
 
   Future<void> _save() async {
@@ -2009,11 +1986,8 @@ class _TransactionSheetState
           .replaceAll(',', ''),
     );
 
-    if (amount == null ||
-        amount <= 0) {
-      _showMessage(
-        'সঠিক পরিমাণ লিখুন',
-      );
+    if (amount == null || amount <= 0) {
+      _showMessage('সঠিক পরিমাণ লিখুন');
       return;
     }
 
@@ -2047,8 +2021,7 @@ class _TransactionSheetState
     });
 
     try {
-      final transaction =
-          MoneyTransaction(
+      final transaction = MoneyTransaction(
         type: _type,
         amount: amount,
         date: DateFormat(
@@ -2062,52 +2035,20 @@ class _TransactionSheetState
         account: _type == 'Transfer'
             ? '$_selectedAccount ➔ $_targetAccount'
             : _selectedAccount!,
-        note:
-            _noteController.text.trim(),
+        note: _noteController.text.trim(),
       );
-
-      // --------------------------------------------------------
-      // DATABASE SAVE
-      // --------------------------------------------------------
 
       await MoneyDbHelper.instance
           .insertTransaction(
         transaction,
       );
 
-      // --------------------------------------------------------
-      // MAIN SCREEN UPDATE
-      // --------------------------------------------------------
-
-      await widget.onSaved();
-
       if (!mounted) return;
 
-      // --------------------------------------------------------
       // IMPORTANT:
-      // Parent Scaffold-এর messenger আগে নিয়ে রাখছি।
-      // Bottom Sheet বন্ধ হওয়ার পর আর sheet context ব্যবহার
-      // করা হবে না।
-      // --------------------------------------------------------
-
-      final messenger =
-          ScaffoldMessenger.of(context);
-
-      Navigator.of(context).pop();
-
-      messenger.hideCurrentSnackBar();
-
-      messenger.showSnackBar(
-        const SnackBar(
-          content: Text(
-            'লেনদেন সফলভাবে সংরক্ষণ হয়েছে',
-          ),
-          behavior:
-              SnackBarBehavior.floating,
-          duration:
-              Duration(seconds: 2),
-        ),
-      );
+      // এখানে আর parent screen update করা হচ্ছে না।
+      // শুধু true দিয়ে BottomSheet বন্ধ করা হচ্ছে।
+      Navigator.of(context).pop(true);
     } catch (e) {
       if (!mounted) return;
 
@@ -2121,9 +2062,11 @@ class _TransactionSheetState
     }
   }
 
-  void _showMessage(
-    String message,
-  ) {
+  // ============================================================
+  // MESSAGE
+  // ============================================================
+
+  void _showMessage(String message) {
     if (!mounted) return;
 
     ScaffoldMessenger.of(context)
@@ -2137,7 +2080,7 @@ class _TransactionSheetState
   }
 
   // ============================================================
-  // SHEET UI
+  // BUILD SHEET
   // ============================================================
 
   @override
@@ -2155,63 +2098,46 @@ class _TransactionSheetState
                   16,
         ),
         decoration: BoxDecoration(
-          color:
-              AppTheme.background,
+          color: AppTheme.background,
           borderRadius:
-              const BorderRadius
-                  .vertical(
-            top:
-                Radius.circular(26),
+              const BorderRadius.vertical(
+            top: Radius.circular(26),
           ),
         ),
-        child:
-            SingleChildScrollView(
+        child: SingleChildScrollView(
           child: Column(
             crossAxisAlignment:
-                CrossAxisAlignment
-                    .start,
+                CrossAxisAlignment.start,
             children: [
               Center(
                 child: Container(
                   width: 42,
                   height: 4,
-                  decoration:
-                      BoxDecoration(
-                    color:
-                        AppTheme.textMuted,
+                  decoration: BoxDecoration(
+                    color: AppTheme.textMuted,
                     borderRadius:
-                        BorderRadius
-                            .circular(
-                      10,
-                    ),
+                        BorderRadius.circular(10),
                   ),
                 ),
               ),
 
-              const SizedBox(
-                height: 15,
-              ),
+              const SizedBox(height: 15),
 
               Text(
                 'নতুন লেনদেন',
                 style: TextStyle(
-                  color:
-                      AppTheme.textPrimary,
+                  color: AppTheme.textPrimary,
                   fontSize: 20,
-                  fontWeight:
-                      FontWeight.w900,
+                  fontWeight: FontWeight.w900,
                 ),
               ),
 
-              const SizedBox(
-                height: 15,
-              ),
+              const SizedBox(height: 15),
 
               Row(
                 children: [
                   Expanded(
-                    child:
-                        _typeButton(
+                    child: _typeButton(
                       'Income',
                       'আয়',
                       Icons
@@ -2219,12 +2145,9 @@ class _TransactionSheetState
                       Colors.blue,
                     ),
                   ),
-                  const SizedBox(
-                    width: 8,
-                  ),
+                  const SizedBox(width: 8),
                   Expanded(
-                    child:
-                        _typeButton(
+                    child: _typeButton(
                       'Expense',
                       'খরচ',
                       Icons
@@ -2232,31 +2155,23 @@ class _TransactionSheetState
                       Colors.redAccent,
                     ),
                   ),
-                  const SizedBox(
-                    width: 8,
-                  ),
+                  const SizedBox(width: 8),
                   Expanded(
-                    child:
-                        _typeButton(
+                    child: _typeButton(
                       'Transfer',
                       'ট্রান্সফার',
-                      Icons
-                          .swap_horiz_rounded,
+                      Icons.swap_horiz_rounded,
                       AppTheme.gold,
                     ),
                   ),
                 ],
               ),
 
-              const SizedBox(
-                height: 16,
-              ),
+              const SizedBox(height: 16),
 
               _label('পরিমাণ'),
 
-              const SizedBox(
-                height: 6,
-              ),
+              const SizedBox(height: 6),
 
               TextField(
                 controller:
@@ -2279,46 +2194,36 @@ class _TransactionSheetState
                 ),
               ),
 
-              const SizedBox(
-                height: 13,
-              ),
+              const SizedBox(height: 13),
 
               _label(
                 'লেনদেনের তারিখ',
               ),
 
-              const SizedBox(
-                height: 6,
-              ),
+              const SizedBox(height: 6),
 
               GestureDetector(
                 onTap: _saving
                     ? null
                     : _selectTransactionDate,
-                child:
-                    Container(
-                  width:
-                      double.infinity,
+                child: Container(
+                  width: double.infinity,
                   padding:
-                      const EdgeInsets
-                          .symmetric(
+                      const EdgeInsets.symmetric(
                     horizontal: 14,
                     vertical: 15,
                   ),
                   decoration:
                       BoxDecoration(
-                    color:
-                        AppTheme.cardColor,
+                    color: AppTheme.cardColor,
                     borderRadius:
-                        BorderRadius
-                            .circular(
+                        BorderRadius.circular(
                       13,
                     ),
-                    border:
-                        Border.all(
-                      color: AppTheme
-                          .gold
-                          .withValues(
+                    border: Border.all(
+                      color:
+                          AppTheme.gold
+                              .withValues(
                         alpha: 0.25,
                       ),
                     ),
@@ -2328,29 +2233,22 @@ class _TransactionSheetState
                       Icon(
                         Icons
                             .calendar_month_rounded,
-                        color:
-                            AppTheme.gold,
+                        color: AppTheme.gold,
                       ),
-                      const SizedBox(
-                        width: 10,
-                      ),
+                      const SizedBox(width: 10),
                       Expanded(
-                        child:
-                            Text(
+                        child: Text(
                           DateFormat(
                             'dd/MM/yyyy',
                           ).format(
                             _selectedDate,
                           ),
-                          style:
-                              TextStyle(
+                          style: TextStyle(
                             color:
-                                AppTheme
-                                    .textPrimary,
+                                AppTheme.textPrimary,
                             fontSize: 13,
                             fontWeight:
-                                FontWeight
-                                    .w700,
+                                FontWeight.w700,
                           ),
                         ),
                       ),
@@ -2365,9 +2263,7 @@ class _TransactionSheetState
                 ),
               ),
 
-              const SizedBox(
-                height: 13,
-              ),
+              const SizedBox(height: 13),
 
               _label(
                 _type == 'Transfer'
@@ -2375,14 +2271,10 @@ class _TransactionSheetState
                     : 'অ্যাকাউন্ট',
               ),
 
-              const SizedBox(
-                height: 6,
-              ),
+              const SizedBox(height: 6),
 
-              DropdownButtonFormField<
-                  String>(
-                value:
-                    _selectedAccount,
+              DropdownButtonFormField<String>(
+                value: _selectedAccount,
                 isExpanded: true,
                 decoration:
                     const InputDecoration(),
@@ -2391,47 +2283,32 @@ class _TransactionSheetState
                       (account) {
                         return DropdownMenuItem<
                             String>(
-                          value:
-                              account,
-                          child:
-                              Text(
-                            account,
-                          ),
+                          value: account,
+                          child: Text(account),
                         );
                       },
                     )
                     .toList(),
-                onChanged:
-                    _saving
-                        ? null
-                        : (value) {
-                            setState(() {
-                              _selectedAccount =
-                                  value;
-                            });
-                          },
+                onChanged: _saving
+                    ? null
+                    : (value) {
+                        setState(() {
+                          _selectedAccount =
+                              value;
+                        });
+                      },
               ),
 
-              if (_type ==
-                  'Transfer') ...[
-                const SizedBox(
-                  height: 13,
-                ),
+              if (_type == 'Transfer') ...[
+                const SizedBox(height: 13),
 
-                _label(
-                  'যে অ্যাকাউন্টে',
-                ),
+                _label('যে অ্যাকাউন্টে'),
 
-                const SizedBox(
-                  height: 6,
-                ),
+                const SizedBox(height: 6),
 
-                DropdownButtonFormField<
-                    String>(
-                  value:
-                      _targetAccount,
-                  isExpanded:
-                      true,
+                DropdownButtonFormField<String>(
+                  value: _targetAccount,
+                  isExpanded: true,
                   decoration:
                       const InputDecoration(),
                   items: widget.accounts
@@ -2439,107 +2316,81 @@ class _TransactionSheetState
                         (account) {
                           return DropdownMenuItem<
                               String>(
-                            value:
-                                account,
+                            value: account,
                             child:
-                                Text(
-                              account,
-                            ),
+                                Text(account),
                           );
                         },
                       )
                       .toList(),
-                  onChanged:
-                      _saving
-                          ? null
-                          : (value) {
-                              setState(() {
-                                _targetAccount =
-                                    value;
-                              });
-                            },
+                  onChanged: _saving
+                      ? null
+                      : (value) {
+                          setState(() {
+                            _targetAccount =
+                                value;
+                          });
+                        },
                 ),
               ],
 
-              if (_type !=
-                  'Transfer') ...[
-                const SizedBox(
-                  height: 13,
-                ),
+              if (_type != 'Transfer') ...[
+                const SizedBox(height: 13),
 
                 Row(
                   children: [
                     Expanded(
-                      child: _label(
-                        'খাত',
-                      ),
+                      child: _label('খাত'),
                     ),
                     TextButton.icon(
-                      onPressed:
-                          _saving
-                              ? null
-                              : _addCategory,
-                      icon:
-                          const Icon(
+                      onPressed: _saving
+                          ? null
+                          : _addCategory,
+                      icon: const Icon(
                         Icons.add_rounded,
                         size: 17,
                       ),
-                      label:
-                          const Text(
+                      label: const Text(
                         'নতুন খাত',
                       ),
                     ),
                   ],
                 ),
 
-                const SizedBox(
-                  height: 2,
-                ),
+                const SizedBox(height: 2),
 
-                DropdownButtonFormField<
-                    String>(
-                  value:
-                      _selectedCategory,
-                  isExpanded:
-                      true,
+                DropdownButtonFormField<String>(
+                  value: _selectedCategory,
+                  isExpanded: true,
                   decoration:
                       const InputDecoration(),
                   items:
-                      _currentCategories
-                          .map(
+                      _currentCategories.map(
                     (category) {
                       return DropdownMenuItem<
                           String>(
-                        value:
-                            category,
+                        value: category,
                         child:
-                            Text(
-                          category,
-                        ),
+                            Text(category),
                       );
                     },
                   ).toList(),
-                  onChanged:
-                      _saving
-                          ? null
-                          : (value) {
-                              setState(() {
-                                _selectedCategory =
-                                    value;
-                              });
-                            },
+                  onChanged: _saving
+                      ? null
+                      : (value) {
+                          setState(() {
+                            _selectedCategory =
+                                value;
+                          });
+                        },
                 ),
               ],
 
-              const SizedBox(
-                height: 13,
-              ),
+              const SizedBox(height: 13),
 
               _label('নোট'),
 
-              const SizedBox(
-                height: 6,
-              ),
+              const SizedBox(height: 6),
 
               TextField(
                 controller:
@@ -2557,35 +2408,27 @@ class _TransactionSheetState
                 ),
               ),
 
-              const SizedBox(
-                height: 18,
-              ),
+              const SizedBox(height: 18),
 
               SizedBox(
-                width:
-                    double.infinity,
+                width: double.infinity,
                 height: 52,
-                child:
-                    ElevatedButton.icon(
+                child: ElevatedButton.icon(
                   onPressed:
-                      _saving
-                          ? null
-                          : _save,
+                      _saving ? null : _save,
                   icon: _saving
                       ? const SizedBox(
                           width: 19,
                           height: 19,
                           child:
                               CircularProgressIndicator(
-                            strokeWidth:
-                                2.2,
+                            strokeWidth: 2.2,
                             color:
                                 AppTheme.darkGreen,
                           ),
                         )
                       : const Icon(
-                          Icons
-                              .save_rounded,
+                          Icons.save_rounded,
                         ),
                   label: Text(
                     _saving
@@ -2595,8 +2438,7 @@ class _TransactionSheetState
                         const TextStyle(
                       fontSize: 15,
                       fontWeight:
-                          FontWeight
-                              .w800,
+                          FontWeight.w800,
                     ),
                   ),
                 ),
@@ -2612,17 +2454,13 @@ class _TransactionSheetState
   // LABEL
   // ============================================================
 
-  Widget _label(
-    String text,
-  ) {
+  Widget _label(String text) {
     return Text(
       text,
       style: TextStyle(
-        color:
-            AppTheme.textPrimary,
+        color: AppTheme.textPrimary,
         fontSize: 12.5,
-        fontWeight:
-            FontWeight.w700,
+        fontWeight: FontWeight.w700,
       ),
     );
   }
@@ -2637,8 +2475,7 @@ class _TransactionSheetState
     IconData icon,
     Color color,
   ) {
-    final selected =
-        _type == type;
+    final selected = _type == type;
 
     return GestureDetector(
       onTap: _saving
@@ -2663,8 +2500,7 @@ class _TransactionSheetState
                               .first
                           : null;
                 } else {
-                  _selectedCategory =
-                      null;
+                  _selectedCategory = null;
                 }
               });
             },
@@ -2674,19 +2510,15 @@ class _TransactionSheetState
           vertical: 11,
           horizontal: 5,
         ),
-        decoration:
-            BoxDecoration(
+        decoration: BoxDecoration(
           color: selected
               ? color.withValues(
                   alpha: 0.16,
                 )
               : AppTheme.cardColor,
           borderRadius:
-              BorderRadius.circular(
-            13,
-          ),
-          border:
-              Border.all(
+              BorderRadius.circular(13),
+          border: Border.all(
             color: selected
                 ? color
                 : AppTheme.textMuted
@@ -2704,20 +2536,15 @@ class _TransactionSheetState
                   : AppTheme.textMuted,
               size: 20,
             ),
-            const SizedBox(
-              height: 4,
-            ),
+            const SizedBox(height: 4),
             Text(
               title,
-              style:
-                  TextStyle(
+              style: TextStyle(
                 color: selected
                     ? color
-                    : AppTheme
-                        .textMuted,
+                    : AppTheme.textMuted,
                 fontSize: 11,
-                fontWeight:
-                    FontWeight.w800,
+                fontWeight: FontWeight.w800,
               ),
             ),
           ],
