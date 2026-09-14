@@ -25,7 +25,10 @@ class _CalendarScreenState extends State<CalendarScreen> {
         padding: const EdgeInsets.all(16),
         child: Column(
           children: [
-            // Selected date card
+            // =========================
+            // SELECTED DATE CARD
+            // =========================
+
             Container(
               width: double.infinity,
               padding: const EdgeInsets.all(22),
@@ -33,12 +36,12 @@ class _CalendarScreenState extends State<CalendarScreen> {
                 color: AppTheme.darkGreen,
                 borderRadius: BorderRadius.circular(24),
                 border: Border.all(
-                  color: AppTheme.gold.withOpacity(0.6),
+                  color: AppTheme.gold.withValues(alpha: 0.6),
                   width: 0.7,
                 ),
                 boxShadow: [
                   BoxShadow(
-                    color: AppTheme.darkGreen.withOpacity(0.18),
+                    color: AppTheme.darkGreen.withValues(alpha: 0.18),
                     blurRadius: 15,
                     offset: const Offset(0, 7),
                   ),
@@ -79,7 +82,10 @@ class _CalendarScreenState extends State<CalendarScreen> {
 
             const SizedBox(height: 16),
 
-            // Calendar
+            // =========================
+            // CALENDAR
+            // =========================
+
             Expanded(
               child: Container(
                 padding: const EdgeInsets.all(8),
@@ -87,7 +93,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
                   color: AppTheme.cardColor,
                   borderRadius: BorderRadius.circular(24),
                   border: Border.all(
-                    color: AppTheme.gold.withOpacity(0.35),
+                    color: AppTheme.gold.withValues(alpha: 0.35),
                   ),
                 ),
                 child: CalendarDatePicker(
@@ -105,7 +111,10 @@ class _CalendarScreenState extends State<CalendarScreen> {
 
             const SizedBox(height: 12),
 
-            // Today button
+            // =========================
+            // TODAY BUTTON
+            // =========================
+
             SizedBox(
               width: double.infinity,
               height: 50,
@@ -115,7 +124,9 @@ class _CalendarScreenState extends State<CalendarScreen> {
                     selectedDate = DateTime.now();
                   });
                 },
-                icon: const Icon(Icons.today_rounded),
+                icon: const Icon(
+                  Icons.today_rounded,
+                ),
                 label: const Text(
                   'আজকের তারিখ',
                   style: TextStyle(
@@ -138,6 +149,10 @@ class _CalendarScreenState extends State<CalendarScreen> {
       ),
     );
   }
+
+  // =========================
+  // MONTH NAME
+  // =========================
 
   String monthName(int month) {
     const months = [
