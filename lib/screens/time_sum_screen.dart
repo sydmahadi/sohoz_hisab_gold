@@ -1,87 +1,219 @@
 import 'package:flutter/material.dart';
 
-import '../logic/calculator_logic.dart';
-import '../models/calculator_model.dart';
 import '../theme/app_theme.dart';
 
-class MonthlyAverageScreen extends StatefulWidget {
-  const MonthlyAverageScreen({super.key});
+class TimeSumScreen extends StatefulWidget {
+  const TimeSumScreen({super.key});
 
   @override
-  State<MonthlyAverageScreen> createState() => _MonthlyAverageScreenState();
+  State<TimeSumScreen> createState() => _TimeSumScreenState();
 }
 
-class _MonthlyAverageScreenState extends State<MonthlyAverageScreen> {
-  final TextEditingController _daysController = TextEditingController();
-  final TextEditingController _valueController = TextEditingController();
+class _TimeSumScreenState extends State<TimeSumScreen> {
+  final List<TextEditingController> _controllers = [
+    TextEditingController(),
+    TextEditingController(),
+  ];
 
-  AverageType _type = AverageType.count;
   String? _result;
 
-  void _calculate() {
-    final days = double.tryParse(_daysController.text.trim());
+  // ============================================================
+  // ADD FIELD
+  // ============================================================
 
-    if (days == null || days <= 0) {
-      setState(() {
-        _result = 'সঠিক দিন ইনপুট দিন';
-      });
+  void _addField() {
+    setState(() {
+      _controllers.add(TextEditingController());
+    });
+  }
+
+  // ============================================================
+  // REMOVE FIELD
+  // ============================================================
+
+  void _removeField(int index) {
+    if (_controllers.length <= 2) {
       return;
     }
 
-    if (_type == AverageType.count) {
-      final value = double.tryParse(_valueController.text.trim());
+    _controllers[index].dispose();
 
-      if (value == null || value < 0) {
+    setState(() {
+      _controllers.removeAt(index);
+    });
+  }
+
+  // ============================================================
+  // PARSE TIME
+  // Format: hours.minutes
+  // Example: 2.30 = 2 hours 30 minutes
+  //          200.20 = 200 hours 20 minutes
+  // ============================================================
+
+  int? _parseTime(String value) {
+    final text = value.trim();
+
+    if (text.isEmpty) {
+      return null;
+    }
+
+    final parts = text.split('.');
+
+    if (parts.length > 2) {
+      return null;
+    }
+
+    final hours = int.tryParse(parts[0]);
+
+    if (hours == null || hours < 0) {
+      return null;
+    }
+
+    int minutes = 0;
+
+    if (parts.length == 2) {
+      final minuteText = parts[1];
+
+      if (minuteText.isEmpty) {
+        minutes = 0;
+      } else {
+        minutes = int.tryParse(minuteText) ?? -1;
+      }
+    }
+
+    if (minutes < 0 || minutes > 59) {
+      return null;
+    }
+
+    return (hours * 60) + minutes;
+  }
+
+  // ============================================================
+  // CALCULATE
+  // ============================================================
+
+  void _calculate() {
+    int totalMinutes = 0;
+
+    for (final controller in _controllers) {
+      final value = controller.text.trim();
+
+      if (value.isEmpty) {
+        continue;
+      }
+
+      final minutes = _parseTime(value);
+
+      if (minutes == null) {
         setState(() {
-          _result = 'সঠিক সংখ্যা ইনপুট দিন';
+          _result =
+              'সঠিক সময় লিখুন।\nউদাহরণ: 2.30 অথবা 200.20';
         });
         return;
       }
 
-      setState(() {
-        _result = CalculatorLogic.monthlyCount(
-          days: days,
-          value: value,
-        );
-      });
-    } else {
-      setState(() {
-        _result = CalculatorLogic.monthlyTime(
-          days: days,
-          time: _valueController.text,
-        );
-      });
+      totalMinutes += minutes;
     }
+
+    if (totalMinutes == 0) {
+      setState(() {
+        _result = 'কমপক্ষে একটি সময় ইনপুট দিন';
+      });
+      return;
+    }
+
+    final hours = totalMinutes ~/ 60;
+    final minutes = totalMinutes % 60;
+
+    setState(() {
+      _result = '$hours ঘণ্টা $minutes মিনিট';
+    });
   }
 
+  // ============================================================
+  // CLEAR
+  // ============================================================
+
   void _clear() {
-    _daysController.clear();
-    _valueController.clear();
+    for (final controller in _controllers) {
+      controller.clear();
+    }
 
     setState(() {
       _result = null;
     });
   }
 
+  // ============================================================
+  // DISPOSE
+  // ============================================================
+
   @override
   void dispose() {
-    _daysController.dispose();
-    _valueController.dispose();
+    for (final controller in _controllers) {
+      controller.dispose();
+    }
+
     super.dispose();
   }
 
+  // ============================================================
+  // INPUT FIELD
+  // ============================================================
+
+  Widget _buildTimeField(int index) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Row(
+        children: [
+          Expanded(
+            child: TextField(
+              controller: _controllers[index],
+              keyboardType: const TextInputType.numberWithOptions(
+                decimal: true,
+              ),
+              style: TextStyle(
+                color: AppTheme.textPrimary,
+              ),
+              decoration: InputDecoration(
+                labelText: 'সময় ${index + 1}',
+                hintText: 'যেমন: 2.30',
+                prefixIcon: Icon(
+                  Icons.access_time_rounded,
+                  color: AppTheme.gold,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          if (_controllers.length > 2)
+            IconButton(
+              onPressed: () => _removeField(index),
+              tooltip: 'মুছে ফেলুন',
+              icon: Icon(
+                Icons.remove_circle_outline,
+                color: AppTheme.danger,
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  // ============================================================
+  // BUILD
+  // ============================================================
+
   @override
   Widget build(BuildContext context) {
-    final bool isTime = _type == AverageType.time;
-
     return Scaffold(
       backgroundColor: AppTheme.background,
       appBar: AppBar(
-        title: const Text('মাসিক গড়'),
+        title: const Text('সময় যোগ'),
         actions: [
           IconButton(
             onPressed: _clear,
-            tooltip: 'মুছে ফেলুন',
+            tooltip: 'সব মুছে ফেলুন',
             icon: const Icon(Icons.refresh_rounded),
           ),
         ],
@@ -91,19 +223,23 @@ class _MonthlyAverageScreenState extends State<MonthlyAverageScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            // ==================================================
+            // HEADER CARD
+            // ==================================================
+
             Card(
               child: Padding(
                 padding: const EdgeInsets.all(20),
                 child: Column(
                   children: [
                     const Icon(
-                      Icons.calendar_view_month_rounded,
+                      Icons.access_time_filled_rounded,
                       color: AppTheme.gold,
                       size: 46,
                     ),
                     const SizedBox(height: 12),
                     Text(
-                      'মাসিক গড় হিসাব',
+                      'সময় যোগ করুন',
                       style: TextStyle(
                         color: AppTheme.textPrimary,
                         fontSize: 20,
@@ -112,7 +248,7 @@ class _MonthlyAverageScreenState extends State<MonthlyAverageScreen> {
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      'আপনার দেওয়া দিনের হিসাব থেকে ৩০ দিনের মাসিক গড় বের করুন',
+                      'একাধিক সময় যোগ করে মোট সময় বের করুন',
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         color: AppTheme.textMuted,
@@ -126,6 +262,10 @@ class _MonthlyAverageScreenState extends State<MonthlyAverageScreen> {
 
             const SizedBox(height: 18),
 
+            // ==================================================
+            // INPUT CARD
+            // ==================================================
+
             Card(
               child: Padding(
                 padding: const EdgeInsets.all(18),
@@ -133,115 +273,61 @@ class _MonthlyAverageScreenState extends State<MonthlyAverageScreen> {
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     Text(
-                      'হিসাবের ধরন',
+                      'সময়গুলো লিখুন',
                       style: TextStyle(
                         color: AppTheme.goldLight,
                         fontSize: 15,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
-
-                    const SizedBox(height: 10),
-
-                    SegmentedButton<AverageType>(
-                      segments: const [
-                        ButtonSegment<AverageType>(
-                          value: AverageType.count,
-                          icon: Icon(Icons.numbers_rounded),
-                          label: Text('সংখ্যা'),
-                        ),
-                        ButtonSegment<AverageType>(
-                          value: AverageType.time,
-                          icon: Icon(Icons.access_time_rounded),
-                          label: Text('সময়'),
-                        ),
-                      ],
-                      selected: {_type},
-                      onSelectionChanged: (selection) {
-                        setState(() {
-                          _type = selection.first;
-                          _result = null;
-                          _valueController.clear();
-                        });
-                      },
-                      style: ButtonStyle(
-                        foregroundColor:
-                            WidgetStateProperty.resolveWith<Color?>(
-                          (states) {
-                            if (states.contains(WidgetState.selected)) {
-                              return Colors.black;
-                            }
-                            return AppTheme.textPrimary;
-                          },
-                        ),
-                        backgroundColor:
-                            WidgetStateProperty.resolveWith<Color?>(
-                          (states) {
-                            if (states.contains(WidgetState.selected)) {
-                              return AppTheme.gold;
-                            }
-                            return AppTheme.cardLight;
-                          },
-                        ),
-                      ),
-                    ),
-
-                    const SizedBox(height: 18),
-
-                    TextField(
-                      controller: _daysController,
-                      keyboardType: const TextInputType.numberWithOptions(
-                        decimal: true,
-                      ),
-                      decoration: const InputDecoration(
-                        labelText: 'মোট দিন',
-                        hintText: 'যেমন: 15',
-                        prefixIcon: Icon(
-                          Icons.calendar_today_rounded,
-                        ),
-                      ),
-                    ),
-
                     const SizedBox(height: 15),
 
-                    TextField(
-                      controller: _valueController,
-                      keyboardType: const TextInputType.numberWithOptions(
-                        decimal: true,
-                      ),
-                      decoration: InputDecoration(
-                        labelText: isTime ? 'মোট সময়' : 'মোট সংখ্যা',
-                        hintText: isTime ? 'যেমন: 45.30' : 'যেমন: 150',
-                        prefixIcon: Icon(
-                          isTime
-                              ? Icons.schedule_rounded
-                              : Icons.numbers_rounded,
-                        ),
-                      ),
+                    ...List.generate(
+                      _controllers.length,
+                      (index) => _buildTimeField(index),
                     ),
 
-                    if (isTime) ...[
-                      const SizedBox(height: 8),
-                      Text(
-                        'সময় ঘণ্টা.মিনিট ফরম্যাটে লিখুন। যেমন: 45.30',
-                        style: TextStyle(
-                          color: AppTheme.textMuted,
-                          fontSize: 12,
-                        ),
-                      ),
-                    ],
+                    const SizedBox(height: 4),
 
-                    const SizedBox(height: 18),
+                    OutlinedButton.icon(
+                      onPressed: _addField,
+                      icon: const Icon(
+                        Icons.add_circle_outline,
+                      ),
+                      label: const Text('আরও সময় যোগ করুন'),
+                    ),
+
+                    const SizedBox(height: 14),
 
                     ElevatedButton.icon(
                       onPressed: _calculate,
-                      icon: const Icon(Icons.calculate_rounded),
+                      icon: const Icon(
+                        Icons.calculate_rounded,
+                      ),
                       label: const Text('হিসাব করুন'),
+                    ),
+
+                    const SizedBox(height: 12),
+
+                    Text(
+                      'ফরম্যাট: ঘণ্টা.মিনিট\n'
+                      'উদাহরণ: 2.30 = ২ ঘণ্টা ৩০ মিনিট\n'
+                      '200.20 = ২০০ ঘণ্টা ২০ মিনিট',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: AppTheme.textMuted,
+                        fontSize: 12,
+                        height: 1.5,
+                      ),
                     ),
                   ],
                 ),
               ),
             ),
+
+            // ==================================================
+            // RESULT
+            // ==================================================
 
             if (_result != null) ...[
               const SizedBox(height: 18),
@@ -258,7 +344,7 @@ class _MonthlyAverageScreenState extends State<MonthlyAverageScreen> {
                       ),
                       const SizedBox(height: 10),
                       Text(
-                        'মাসিক গড়',
+                        'মোট সময়',
                         style: TextStyle(
                           color: AppTheme.textMuted,
                           fontSize: 15,
@@ -272,14 +358,6 @@ class _MonthlyAverageScreenState extends State<MonthlyAverageScreen> {
                           color: AppTheme.goldLight,
                           fontSize: 25,
                           fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const SizedBox(height: 6),
-                      Text(
-                        '৩০ দিনের ভিত্তিতে',
-                        style: TextStyle(
-                          color: AppTheme.textMuted,
-                          fontSize: 13,
                         ),
                       ),
                     ],
