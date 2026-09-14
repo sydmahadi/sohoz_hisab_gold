@@ -19,7 +19,6 @@ class _MoneyManagerScreenState extends State<MoneyManagerScreen> {
   int _currentIndex = 0;
   int _statsTab = 1;
 
-  DateTime _selectedDate = DateTime.now();
   String _filterType = 'Monthly';
 
   List<MoneyTransaction> _transactions = [];
@@ -100,6 +99,10 @@ class _MoneyManagerScreenState extends State<MoneyManagerScreen> {
     _loadTransactions();
   }
 
+  // ============================================================
+  // LOAD DATA
+  // ============================================================
+
   Future<void> _loadTransactions() async {
     final data =
         await MoneyDbHelper.instance.getAllTransactions();
@@ -138,65 +141,92 @@ class _MoneyManagerScreenState extends State<MoneyManagerScreen> {
     });
   }
 
+  // ============================================================
+  // DATE PARSE
+  // ============================================================
+
   DateTime? _parseDate(String value) {
     try {
-      return DateFormat('dd/MM/yyyy').parse(value);
+      return DateFormat('dd/MM/yyyy').parseStrict(value);
     } catch (_) {
       return null;
     }
   }
 
+  // ============================================================
+  // FILTER
+  // ============================================================
+
   List<MoneyTransaction> get _filteredTransactions {
+    final now = DateTime.now();
+
     return _transactions.where((transaction) {
       final date = _parseDate(transaction.date);
 
       if (date == null) return false;
 
+      final transactionDate = DateTime(
+        date.year,
+        date.month,
+        date.day,
+      );
+
+      final today = DateTime(
+        now.year,
+        now.month,
+        now.day,
+      );
+
+      // --------------------------------------------------------
+      // DAILY = TODAY
+      // --------------------------------------------------------
+
       if (_filterType == 'Daily') {
-        return date.year == _selectedDate.year &&
-            date.month == _selectedDate.month &&
-            date.day == _selectedDate.day;
+        return transactionDate == today;
       }
 
+      // --------------------------------------------------------
+      // WEEKLY = CURRENT WEEK
+      // Monday -> Sunday
+      // --------------------------------------------------------
+
       if (_filterType == 'Weekly') {
-        final start = _selectedDate.subtract(
-          Duration(days: _selectedDate.weekday - 1),
+        final startOfWeek = today.subtract(
+          Duration(days: today.weekday - 1),
         );
 
-        final end = start.add(
+        final endOfWeek = startOfWeek.add(
           const Duration(days: 6),
         );
 
-        final current = DateTime(
-          date.year,
-          date.month,
-          date.day,
-        );
-
-        final firstDay = DateTime(
-          start.year,
-          start.month,
-          start.day,
-        );
-
-        final lastDay = DateTime(
-          end.year,
-          end.month,
-          end.day,
-        );
-
-        return !current.isBefore(firstDay) &&
-            !current.isAfter(lastDay);
+        return !transactionDate.isBefore(startOfWeek) &&
+            !transactionDate.isAfter(endOfWeek);
       }
+
+      // --------------------------------------------------------
+      // MONTHLY = CURRENT MONTH
+      // --------------------------------------------------------
+
+      if (_filterType == 'Monthly') {
+        return transactionDate.year == today.year &&
+            transactionDate.month == today.month;
+      }
+
+      // --------------------------------------------------------
+      // YEARLY = CURRENT YEAR
+      // --------------------------------------------------------
 
       if (_filterType == 'Yearly') {
-        return date.year == _selectedDate.year;
+        return transactionDate.year == today.year;
       }
 
-      return date.year == _selectedDate.year &&
-          date.month == _selectedDate.month;
+      return false;
     }).toList();
   }
+
+  // ============================================================
+  // TOTALS
+  // ============================================================
 
   double _totalByType(String type) {
     return _filteredTransactions
@@ -213,6 +243,10 @@ class _MoneyManagerScreenState extends State<MoneyManagerScreen> {
 
   double get _balance => _totalIncome - _totalExpense;
 
+  // ============================================================
+  // CATEGORY TOTAL
+  // ============================================================
+
   Map<String, double> _categoryTotals(String type) {
     final result = <String, double>{};
 
@@ -226,6 +260,10 @@ class _MoneyManagerScreenState extends State<MoneyManagerScreen> {
 
     return result;
   }
+
+  // ============================================================
+  // ACCOUNT BALANCE
+  // ============================================================
 
   double _accountBalance(String accountName) {
     double balance = 0;
@@ -264,6 +302,10 @@ class _MoneyManagerScreenState extends State<MoneyManagerScreen> {
     return balance;
   }
 
+  // ============================================================
+  // ADD TRANSACTION
+  // ============================================================
+
   Future<void> _openAddTransaction() async {
     await _loadCategories();
 
@@ -287,23 +329,9 @@ class _MoneyManagerScreenState extends State<MoneyManagerScreen> {
     await _loadTransactions();
   }
 
-  Future<void> _selectFilterDate() async {
-    final picked = await showDatePicker(
-      context: context,
-      initialDate: _selectedDate,
-      firstDate: DateTime(2020),
-      lastDate: DateTime(2100),
-      helpText: 'তারিখ নির্বাচন করুন',
-      cancelText: 'বাতিল',
-      confirmText: 'নির্বাচন',
-    );
-
-    if (picked == null) return;
-
-    setState(() {
-      _selectedDate = picked;
-    });
-  }
+  // ============================================================
+  // DELETE
+  // ============================================================
 
   Future<void> _confirmDeleteTransaction(
     MoneyTransaction transaction,
@@ -366,6 +394,10 @@ class _MoneyManagerScreenState extends State<MoneyManagerScreen> {
       ),
     );
   }
+
+  // ============================================================
+  // BUILD
+  // ============================================================
 
   @override
   Widget build(BuildContext context) {
@@ -464,35 +496,70 @@ class _MoneyManagerScreenState extends State<MoneyManagerScreen> {
     );
   }
 
+  // ============================================================
+  // TRANSACTION VIEW
+  // ============================================================
+
   Widget _buildTransactionView() {
-    final transactions =
-        _filteredTransactions.reversed.toList();
+    final transactions = [..._filteredTransactions];
+
+    transactions.sort((a, b) {
+      final dateA = _parseDate(a.date);
+      final dateB = _parseDate(b.date);
+
+      if (dateA == null || dateB == null) {
+        return 0;
+      }
+
+      final dateCompare = dateB.compareTo(dateA);
+
+      if (dateCompare != 0) {
+        return dateCompare;
+      }
+
+      return (b.id ?? 0).compareTo(a.id ?? 0);
+    });
+
+    final grouped = <String, List<MoneyTransaction>>{};
+
+    for (final transaction in transactions) {
+      grouped.putIfAbsent(
+        transaction.date,
+        () => [],
+      );
+
+      grouped[transaction.date]!.add(transaction);
+    }
 
     return Column(
       children: [
         _buildFilterBar(),
+
         Expanded(
-          child: transactions.isEmpty
+          child: grouped.isEmpty
               ? _emptyState(
                   Icons.receipt_long_outlined,
-                  'এই সময়ে কোনো লেনদেন নেই',
+                  _emptyFilterMessage(),
                 )
               : RefreshIndicator(
                   onRefresh: _loadTransactions,
                   color: AppTheme.gold,
-                  child: ListView.builder(
+                  child: ListView(
                     padding: const EdgeInsets.fromLTRB(
                       12,
                       8,
                       12,
                       100,
                     ),
-                    itemCount: transactions.length,
-                    itemBuilder: (context, index) {
-                      return _transactionCard(
-                        transactions[index],
+                    children: grouped.entries.map((entry) {
+                      final date = _parseDate(entry.key);
+
+                      return _buildDateGroup(
+                        entry.key,
+                        date,
+                        entry.value,
                       );
-                    },
+                    }).toList(),
                   ),
                 ),
         ),
@@ -500,72 +567,249 @@ class _MoneyManagerScreenState extends State<MoneyManagerScreen> {
     );
   }
 
+  // ============================================================
+  // EMPTY MESSAGE
+  // ============================================================
+
+  String _emptyFilterMessage() {
+    if (_filterType == 'Daily') {
+      return 'আজ কোনো লেনদেন নেই';
+    }
+
+    if (_filterType == 'Weekly') {
+      return 'এই সপ্তাহে কোনো লেনদেন নেই';
+    }
+
+    if (_filterType == 'Monthly') {
+      return 'এই মাসে কোনো লেনদেন নেই';
+    }
+
+    return 'এই বছরে কোনো লেনদেন নেই';
+  }
+
+  // ============================================================
+  // FILTER BAR
+  // ============================================================
+
   Widget _buildFilterBar() {
     return Padding(
       padding: const EdgeInsets.fromLTRB(
         12,
         10,
         12,
-        4,
+        5,
       ),
-      child: Row(
-        children: [
-          Expanded(
-            child: SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: Row(
-                children: [
-                  'Daily',
-                  'Weekly',
-                  'Monthly',
-                  'Yearly',
-                ].map((item) {
-                  final selected = _filterType == item;
-
-                  return Padding(
-                    padding: const EdgeInsets.only(
-                      right: 7,
-                    ),
-                    child: ChoiceChip(
-                      label: Text(
-                        item == 'Daily'
-                            ? 'দৈনিক'
-                            : item == 'Weekly'
-                                ? 'সাপ্তাহিক'
-                                : item == 'Monthly'
-                                    ? 'মাসিক'
-                                    : 'বার্ষিক',
-                      ),
-                      selected: selected,
-                      onSelected: (_) {
-                        setState(() {
-                          _filterType = item;
-                        });
-                      },
-                      selectedColor: AppTheme.gold,
-                      labelStyle: TextStyle(
-                        color: selected
-                            ? AppTheme.darkGreen
-                            : AppTheme.textPrimary,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  );
-                }).toList(),
-              ),
-            ),
+      child: Container(
+        padding: const EdgeInsets.all(5),
+        decoration: BoxDecoration(
+          color: AppTheme.cardColor,
+          borderRadius: BorderRadius.circular(15),
+          border: Border.all(
+            color: AppTheme.gold.withValues(alpha: 0.15),
           ),
-          IconButton(
-            onPressed: _selectFilterDate,
-            icon: Icon(
-              Icons.calendar_month_rounded,
-              color: AppTheme.gold,
+        ),
+        child: Row(
+          children: [
+            _filterButton(
+              'Daily',
+              'দৈনিক',
             ),
-          ),
-        ],
+            _filterButton(
+              'Weekly',
+              'সাপ্তাহিক',
+            ),
+            _filterButton(
+              'Monthly',
+              'মাসিক',
+            ),
+            _filterButton(
+              'Yearly',
+              'বার্ষিক',
+            ),
+          ],
+        ),
       ),
     );
   }
+
+  Widget _filterButton(
+    String value,
+    String title,
+  ) {
+    final selected = _filterType == value;
+
+    return Expanded(
+      child: GestureDetector(
+        onTap: () {
+          setState(() {
+            _filterType = value;
+          });
+        },
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          padding: const EdgeInsets.symmetric(
+            vertical: 10,
+            horizontal: 3,
+          ),
+          decoration: BoxDecoration(
+            color: selected
+                ? AppTheme.gold
+                : Colors.transparent,
+            borderRadius: BorderRadius.circular(11),
+          ),
+          child: Text(
+            title,
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: selected
+                  ? AppTheme.darkGreen
+                  : AppTheme.textMuted,
+              fontSize: 12,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ============================================================
+  // DATE GROUP
+  // ============================================================
+
+  Widget _buildDateGroup(
+    String dateText,
+    DateTime? date,
+    List<MoneyTransaction> transactions,
+  ) {
+    final formattedDate = date == null
+        ? dateText
+        : DateFormat(
+            'dd MMMM yyyy',
+            'bn',
+          ).format(date);
+
+    final dayName = date == null
+        ? ''
+        : DateFormat(
+            'EEEE',
+            'bn',
+          ).format(date);
+
+    final dayIncome = transactions
+        .where((item) => item.type == 'Income')
+        .fold<double>(
+          0,
+          (sum, item) => sum + item.amount,
+        );
+
+    final dayExpense = transactions
+        .where((item) => item.type == 'Expense')
+        .fold<double>(
+          0,
+          (sum, item) => sum + item.amount,
+        );
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // --------------------------------------------------------
+        // DATE HEADER
+        // --------------------------------------------------------
+
+        Padding(
+          padding: const EdgeInsets.fromLTRB(
+            5,
+            12,
+            5,
+            9,
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Container(
+                width: 5,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: AppTheme.gold,
+                  borderRadius: BorderRadius.circular(5),
+                ),
+              ),
+              const SizedBox(width: 10),
+
+              Expanded(
+                child: Column(
+                  crossAxisAlignment:
+                      CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      formattedDate,
+                      style: TextStyle(
+                        color: AppTheme.textPrimary,
+                        fontSize: 18,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    if (dayName.isNotEmpty)
+                      Padding(
+                        padding:
+                            const EdgeInsets.only(top: 2),
+                        child: Text(
+                          dayName,
+                          style: TextStyle(
+                            color: AppTheme.textMuted,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+
+              if (dayIncome > 0 || dayExpense > 0)
+                Column(
+                  crossAxisAlignment:
+                      CrossAxisAlignment.end,
+                  children: [
+                    if (dayIncome > 0)
+                      Text(
+                        '+৳ ${dayIncome.toStringAsFixed(0)}',
+                        style: const TextStyle(
+                          color: Colors.blue,
+                          fontSize: 10,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    if (dayExpense > 0)
+                      Text(
+                        '-৳ ${dayExpense.toStringAsFixed(0)}',
+                        style: const TextStyle(
+                          color: Colors.redAccent,
+                          fontSize: 10,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                  ],
+                ),
+            ],
+          ),
+        ),
+
+        // --------------------------------------------------------
+        // THAT DATE'S TRANSACTIONS
+        // --------------------------------------------------------
+
+        ...transactions.map(
+          (transaction) => _transactionCard(transaction),
+        ),
+      ],
+    );
+  }
+
+  // ============================================================
+  // TRANSACTION CARD
+  // ============================================================
 
   Widget _transactionCard(
     MoneyTransaction transaction,
@@ -587,13 +831,13 @@ class _MoneyManagerScreenState extends State<MoneyManagerScreen> {
             : Icons.swap_horiz_rounded;
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 9),
+      margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.all(13),
       decoration: BoxDecoration(
         color: AppTheme.cardColor,
         borderRadius: BorderRadius.circular(17),
         border: Border.all(
-          color: color.withValues(alpha: 0.25),
+          color: color.withValues(alpha: 0.22),
         ),
       ),
       child: Row(
@@ -610,10 +854,13 @@ class _MoneyManagerScreenState extends State<MoneyManagerScreen> {
               color: color,
             ),
           ),
+
           const SizedBox(width: 11),
+
           Expanded(
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+              crossAxisAlignment:
+                  CrossAxisAlignment.start,
               children: [
                 Text(
                   transfer
@@ -627,7 +874,9 @@ class _MoneyManagerScreenState extends State<MoneyManagerScreen> {
                     fontWeight: FontWeight.w800,
                   ),
                 ),
+
                 const SizedBox(height: 4),
+
                 Text(
                   transaction.account,
                   maxLines: 2,
@@ -637,17 +886,13 @@ class _MoneyManagerScreenState extends State<MoneyManagerScreen> {
                     fontSize: 11,
                   ),
                 ),
-                const SizedBox(height: 2),
-                Text(
-                  transaction.date,
-                  style: TextStyle(
-                    color: AppTheme.textMuted,
-                    fontSize: 10,
-                  ),
-                ),
-                if ((transaction.note ?? '').trim().isNotEmpty)
+
+                if ((transaction.note ?? '')
+                    .trim()
+                    .isNotEmpty)
                   Padding(
-                    padding: const EdgeInsets.only(top: 4),
+                    padding:
+                        const EdgeInsets.only(top: 4),
                     child: Text(
                       transaction.note!,
                       maxLines: 2,
@@ -661,9 +906,12 @@ class _MoneyManagerScreenState extends State<MoneyManagerScreen> {
               ],
             ),
           ),
+
           const SizedBox(width: 8),
+
           Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
+            crossAxisAlignment:
+                CrossAxisAlignment.end,
             children: [
               Text(
                 '${income ? '+' : expense ? '-' : ''}৳ ${transaction.amount.toStringAsFixed(2)}',
@@ -674,10 +922,14 @@ class _MoneyManagerScreenState extends State<MoneyManagerScreen> {
                   fontWeight: FontWeight.w900,
                 ),
               ),
+
               const SizedBox(height: 8),
+
               InkWell(
                 onTap: () {
-                  _confirmDeleteTransaction(transaction);
+                  _confirmDeleteTransaction(
+                    transaction,
+                  );
                 },
                 borderRadius: BorderRadius.circular(20),
                 child: const Padding(
@@ -696,11 +948,17 @@ class _MoneyManagerScreenState extends State<MoneyManagerScreen> {
     );
   }
 
+  // ============================================================
+  // STATS
+  // ============================================================
+
   Widget _buildStatsView() {
     final income = _totalIncome;
     final expense = _totalExpense;
 
-    final type = _statsTab == 0 ? 'Income' : 'Expense';
+    final type =
+        _statsTab == 0 ? 'Income' : 'Expense';
+
     final categories = _categoryTotals(type);
 
     final total = categories.values.fold<double>(
@@ -719,6 +977,41 @@ class _MoneyManagerScreenState extends State<MoneyManagerScreen> {
           30,
         ),
         children: [
+          // FILTER INFO
+
+          Container(
+            padding: const EdgeInsets.symmetric(
+              horizontal: 13,
+              vertical: 10,
+            ),
+            decoration: BoxDecoration(
+              color: AppTheme.gold.withValues(
+                alpha: 0.08,
+              ),
+              borderRadius: BorderRadius.circular(13),
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  Icons.filter_alt_outlined,
+                  color: AppTheme.gold,
+                  size: 18,
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  _filterBanglaName(),
+                  style: TextStyle(
+                    color: AppTheme.goldLight,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          const SizedBox(height: 12),
+
           Row(
             children: [
               Expanded(
@@ -740,16 +1033,22 @@ class _MoneyManagerScreenState extends State<MoneyManagerScreen> {
               ),
             ],
           ),
+
           const SizedBox(height: 12),
+
           _statCard(
             _balance >= 0 ? 'উদ্বৃত্ত' : 'ঘাটতি',
             _balance.abs(),
-            _balance >= 0 ? Colors.green : Colors.redAccent,
+            _balance >= 0
+                ? Colors.green
+                : Colors.redAccent,
             _balance >= 0
                 ? Icons.account_balance_rounded
                 : Icons.warning_amber_rounded,
           ),
+
           const SizedBox(height: 18),
+
           Container(
             padding: const EdgeInsets.all(5),
             decoration: BoxDecoration(
@@ -759,22 +1058,33 @@ class _MoneyManagerScreenState extends State<MoneyManagerScreen> {
             child: Row(
               children: [
                 Expanded(
-                  child: _statsTabButton('আয়', 0),
+                  child: _statsTabButton(
+                    'আয়',
+                    0,
+                  ),
                 ),
                 Expanded(
-                  child: _statsTabButton('খরচ', 1),
+                  child: _statsTabButton(
+                    'খরচ',
+                    1,
+                  ),
                 ),
               ],
             ),
           ),
+
           const SizedBox(height: 15),
+
           if (categories.isEmpty)
             _emptyState(
               Icons.bar_chart_rounded,
-              'কোনো তথ্য নেই',
+              'এই সময়ে কোনো তথ্য নেই',
             )
           else ...[
-            _buildPieChart(categories, total),
+            _buildPieChart(
+              categories,
+              total,
+            ),
             const SizedBox(height: 16),
             _buildCategoryStats(categories),
           ],
@@ -783,23 +1093,50 @@ class _MoneyManagerScreenState extends State<MoneyManagerScreen> {
     );
   }
 
+  String _filterBanglaName() {
+    if (_filterType == 'Daily') {
+      return 'দৈনিক হিসাব';
+    }
+
+    if (_filterType == 'Weekly') {
+      return 'সাপ্তাহিক হিসাব';
+    }
+
+    if (_filterType == 'Monthly') {
+      return 'মাসিক হিসাব';
+    }
+
+    return 'বার্ষিক হিসাব';
+  }
+
+  // ============================================================
+  // PIE CHART
+  // ============================================================
+
   Widget _buildPieChart(
     Map<String, double> data,
     double total,
   ) {
     final entries = data.entries.toList()
-      ..sort((a, b) => b.value.compareTo(a.value));
+      ..sort(
+        (a, b) => b.value.compareTo(a.value),
+      );
 
-    final chartEntries = entries.take(8).toList();
+    final chartEntries =
+        entries.take(8).toList();
 
-    final otherTotal = entries.skip(8).fold<double>(
-      0,
-      (sum, item) => sum + item.value,
-    );
+    final otherTotal =
+        entries.skip(8).fold<double>(
+              0,
+              (sum, item) => sum + item.value,
+            );
 
     if (otherTotal > 0) {
       chartEntries.add(
-        MapEntry('অন্যান্য', otherTotal),
+        MapEntry(
+          'অন্যান্য',
+          otherTotal,
+        ),
       );
     }
 
@@ -826,7 +1163,9 @@ class _MoneyManagerScreenState extends State<MoneyManagerScreen> {
         color: AppTheme.cardColor,
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
-          color: AppTheme.gold.withValues(alpha: 0.18),
+          color: AppTheme.gold.withValues(
+            alpha: 0.18,
+          ),
         ),
       ),
       child: Column(
@@ -851,7 +1190,9 @@ class _MoneyManagerScreenState extends State<MoneyManagerScreen> {
               ),
             ],
           ),
+
           const SizedBox(height: 12),
+
           SizedBox(
             height: 230,
             child: PieChart(
@@ -861,23 +1202,30 @@ class _MoneyManagerScreenState extends State<MoneyManagerScreen> {
                 sections: List.generate(
                   chartEntries.length,
                   (index) {
-                    final entry = chartEntries[index];
+                    final entry =
+                        chartEntries[index];
 
                     final percentage = total == 0
                         ? 0.0
-                        : entry.value / total * 100;
+                        : entry.value /
+                            total *
+                            100;
 
                     return PieChartSectionData(
                       value: entry.value,
-                      color: colors[index % colors.length],
+                      color: colors[
+                          index %
+                              colors.length],
                       radius: 72,
                       title: percentage >= 4
                           ? '${percentage.toStringAsFixed(0)}%'
                           : '',
-                      titleStyle: const TextStyle(
+                      titleStyle:
+                          const TextStyle(
                         color: Colors.white,
                         fontSize: 11,
-                        fontWeight: FontWeight.w900,
+                        fontWeight:
+                            FontWeight.w900,
                       ),
                     );
                   },
@@ -885,7 +1233,9 @@ class _MoneyManagerScreenState extends State<MoneyManagerScreen> {
               ),
             ),
           ),
+
           const SizedBox(height: 5),
+
           Text(
             'মোট ৳ ${total.toStringAsFixed(2)}',
             style: TextStyle(
@@ -894,33 +1244,43 @@ class _MoneyManagerScreenState extends State<MoneyManagerScreen> {
               fontWeight: FontWeight.w900,
             ),
           ),
+
           const SizedBox(height: 14),
+
           Wrap(
             spacing: 12,
             runSpacing: 8,
             children: List.generate(
               chartEntries.length,
               (index) {
-                final entry = chartEntries[index];
+                final entry =
+                    chartEntries[index];
 
                 return Row(
-                  mainAxisSize: MainAxisSize.min,
+                  mainAxisSize:
+                      MainAxisSize.min,
                   children: [
                     Container(
                       width: 9,
                       height: 9,
-                      decoration: BoxDecoration(
-                        color: colors[index % colors.length],
-                        shape: BoxShape.circle,
+                      decoration:
+                          BoxDecoration(
+                        color: colors[
+                            index %
+                                colors.length],
+                        shape:
+                            BoxShape.circle,
                       ),
                     ),
                     const SizedBox(width: 5),
                     Text(
                       entry.key,
                       style: TextStyle(
-                        color: AppTheme.textMuted,
+                        color:
+                            AppTheme.textMuted,
                         fontSize: 10.5,
-                        fontWeight: FontWeight.w600,
+                        fontWeight:
+                            FontWeight.w600,
                       ),
                     ),
                   ],
@@ -932,6 +1292,10 @@ class _MoneyManagerScreenState extends State<MoneyManagerScreen> {
       ),
     );
   }
+
+  // ============================================================
+  // STATS TAB BUTTON
+  // ============================================================
 
   Widget _statsTabButton(
     String title,
@@ -953,7 +1317,8 @@ class _MoneyManagerScreenState extends State<MoneyManagerScreen> {
           color: selected
               ? AppTheme.gold
               : Colors.transparent,
-          borderRadius: BorderRadius.circular(10),
+          borderRadius:
+              BorderRadius.circular(10),
         ),
         child: Text(
           title,
@@ -969,11 +1334,17 @@ class _MoneyManagerScreenState extends State<MoneyManagerScreen> {
     );
   }
 
+  // ============================================================
+  // CATEGORY STATS
+  // ============================================================
+
   Widget _buildCategoryStats(
     Map<String, double> data,
   ) {
     final entries = data.entries.toList()
-      ..sort((a, b) => b.value.compareTo(a.value));
+      ..sort(
+        (a, b) => b.value.compareTo(a.value),
+      );
 
     final total = data.values.fold<double>(
       0,
@@ -983,14 +1354,19 @@ class _MoneyManagerScreenState extends State<MoneyManagerScreen> {
     return Column(
       children: entries.map((entry) {
         final percentage =
-            total == 0 ? 0.0 : entry.value / total;
+            total == 0
+                ? 0.0
+                : entry.value / total;
 
         return Container(
-          margin: const EdgeInsets.only(bottom: 9),
-          padding: const EdgeInsets.all(13),
+          margin:
+              const EdgeInsets.only(bottom: 9),
+          padding:
+              const EdgeInsets.all(13),
           decoration: BoxDecoration(
             color: AppTheme.cardColor,
-            borderRadius: BorderRadius.circular(15),
+            borderRadius:
+                BorderRadius.circular(15),
           ),
           child: Column(
             children: [
@@ -1000,31 +1376,43 @@ class _MoneyManagerScreenState extends State<MoneyManagerScreen> {
                     child: Text(
                       entry.key,
                       style: TextStyle(
-                        color: AppTheme.textPrimary,
+                        color:
+                            AppTheme.textPrimary,
                         fontSize: 13,
-                        fontWeight: FontWeight.w700,
+                        fontWeight:
+                            FontWeight.w700,
                       ),
                     ),
                   ),
                   Text(
                     '৳ ${entry.value.toStringAsFixed(2)}',
                     style: TextStyle(
-                      color: AppTheme.gold,
-                      fontWeight: FontWeight.w800,
+                      color:
+                          AppTheme.gold,
+                      fontWeight:
+                          FontWeight.w800,
                     ),
                   ),
                 ],
               ),
+
               const SizedBox(height: 8),
+
               ClipRRect(
-                borderRadius: BorderRadius.circular(8),
-                child: LinearProgressIndicator(
+                borderRadius:
+                    BorderRadius.circular(8),
+                child:
+                    LinearProgressIndicator(
                   value: percentage,
                   minHeight: 6,
                   backgroundColor:
-                      AppTheme.gold.withValues(alpha: 0.10),
+                      AppTheme.gold
+                          .withValues(
+                    alpha: 0.10,
+                  ),
                   valueColor:
-                      AlwaysStoppedAnimation<Color>(
+                      AlwaysStoppedAnimation<
+                          Color>(
                     AppTheme.gold,
                   ),
                 ),
@@ -1036,6 +1424,10 @@ class _MoneyManagerScreenState extends State<MoneyManagerScreen> {
     );
   }
 
+  // ============================================================
+  // STAT CARD
+  // ============================================================
+
   Widget _statCard(
     String title,
     double amount,
@@ -1046,9 +1438,11 @@ class _MoneyManagerScreenState extends State<MoneyManagerScreen> {
       padding: const EdgeInsets.all(15),
       decoration: BoxDecoration(
         color: AppTheme.cardColor,
-        borderRadius: BorderRadius.circular(18),
+        borderRadius:
+            BorderRadius.circular(18),
         border: Border.all(
-          color: color.withValues(alpha: 0.25),
+          color:
+              color.withValues(alpha: 0.25),
         ),
       ),
       child: Row(
@@ -1057,7 +1451,8 @@ class _MoneyManagerScreenState extends State<MoneyManagerScreen> {
             width: 42,
             height: 42,
             decoration: BoxDecoration(
-              color: color.withValues(alpha: 0.12),
+              color:
+                  color.withValues(alpha: 0.12),
               shape: BoxShape.circle,
             ),
             child: Icon(
@@ -1066,26 +1461,33 @@ class _MoneyManagerScreenState extends State<MoneyManagerScreen> {
               size: 21,
             ),
           ),
+
           const SizedBox(width: 10),
+
           Expanded(
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+              crossAxisAlignment:
+                  CrossAxisAlignment.start,
               children: [
                 Text(
                   title,
                   style: TextStyle(
-                    color: AppTheme.textMuted,
+                    color:
+                        AppTheme.textMuted,
                     fontSize: 11,
                   ),
                 ),
+
                 const SizedBox(height: 3),
+
                 FittedBox(
                   child: Text(
                     '৳ ${amount.toStringAsFixed(2)}',
                     style: TextStyle(
                       color: color,
                       fontSize: 16,
-                      fontWeight: FontWeight.w900,
+                      fontWeight:
+                          FontWeight.w900,
                     ),
                   ),
                 ),
@@ -1096,6 +1498,10 @@ class _MoneyManagerScreenState extends State<MoneyManagerScreen> {
       ),
     );
   }
+
+  // ============================================================
+  // ACCOUNTS
+  // ============================================================
 
   Widget _buildAccountsView() {
     return RefreshIndicator(
@@ -1112,23 +1518,39 @@ class _MoneyManagerScreenState extends State<MoneyManagerScreen> {
           Text(
             'অ্যাকাউন্টসমূহ',
             style: TextStyle(
-              color: AppTheme.textPrimary,
+              color:
+                  AppTheme.textPrimary,
               fontSize: 19,
-              fontWeight: FontWeight.w900,
+              fontWeight:
+                  FontWeight.w900,
             ),
           ),
+
           const SizedBox(height: 12),
+
           ..._accounts.map((account) {
-            final balance = _accountBalance(account);
+            final balance =
+                _accountBalance(account);
 
             return Container(
-              margin: const EdgeInsets.only(bottom: 10),
-              padding: const EdgeInsets.all(16),
+              margin:
+                  const EdgeInsets.only(
+                bottom: 10,
+              ),
+              padding:
+                  const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: AppTheme.cardColor,
-                borderRadius: BorderRadius.circular(18),
+                color:
+                    AppTheme.cardColor,
+                borderRadius:
+                    BorderRadius.circular(
+                  18,
+                ),
                 border: Border.all(
-                  color: AppTheme.gold.withValues(alpha: 0.25),
+                  color: AppTheme.gold
+                      .withValues(
+                    alpha: 0.25,
+                  ),
                 ),
               ),
               child: Row(
@@ -1136,26 +1558,42 @@ class _MoneyManagerScreenState extends State<MoneyManagerScreen> {
                   Container(
                     width: 45,
                     height: 45,
-                    decoration: BoxDecoration(
-                      color: AppTheme.gold.withValues(alpha: 0.12),
-                      borderRadius: BorderRadius.circular(13),
+                    decoration:
+                        BoxDecoration(
+                      color: AppTheme.gold
+                          .withValues(
+                        alpha: 0.12,
+                      ),
+                      borderRadius:
+                          BorderRadius.circular(
+                        13,
+                      ),
                     ),
                     child: Icon(
-                      Icons.account_balance_wallet_rounded,
-                      color: AppTheme.gold,
+                      Icons
+                          .account_balance_wallet_rounded,
+                      color:
+                          AppTheme.gold,
                     ),
                   ),
-                  const SizedBox(width: 12),
+
+                  const SizedBox(
+                    width: 12,
+                  ),
+
                   Expanded(
                     child: Text(
                       account,
                       style: TextStyle(
-                        color: AppTheme.textPrimary,
+                        color:
+                            AppTheme.textPrimary,
                         fontSize: 14,
-                        fontWeight: FontWeight.w800,
+                        fontWeight:
+                            FontWeight.w800,
                       ),
                     ),
                   ),
+
                   Text(
                     '৳ ${balance.toStringAsFixed(2)}',
                     style: TextStyle(
@@ -1163,7 +1601,8 @@ class _MoneyManagerScreenState extends State<MoneyManagerScreen> {
                           ? Colors.green
                           : Colors.redAccent,
                       fontSize: 15,
-                      fontWeight: FontWeight.w900,
+                      fontWeight:
+                          FontWeight.w900,
                     ),
                   ),
                 ],
@@ -1175,27 +1614,36 @@ class _MoneyManagerScreenState extends State<MoneyManagerScreen> {
     );
   }
 
+  // ============================================================
+  // EMPTY STATE
+  // ============================================================
+
   Widget _emptyState(
     IconData icon,
     String text,
   ) {
     return Center(
       child: Padding(
-        padding: const EdgeInsets.all(50),
+        padding:
+            const EdgeInsets.all(50),
         child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisAlignment:
+              MainAxisAlignment.center,
           children: [
             Icon(
               icon,
               size: 55,
-              color: AppTheme.textMuted,
+              color:
+                  AppTheme.textMuted,
             ),
             const SizedBox(height: 12),
             Text(
               text,
-              textAlign: TextAlign.center,
+              textAlign:
+                  TextAlign.center,
               style: TextStyle(
-                color: AppTheme.textMuted,
+                color:
+                    AppTheme.textMuted,
                 fontSize: 13,
               ),
             ),
@@ -1206,7 +1654,12 @@ class _MoneyManagerScreenState extends State<MoneyManagerScreen> {
   }
 }
 
-class _TransactionSheet extends StatefulWidget {
+// ============================================================================
+// TRANSACTION SHEET
+// ============================================================================
+
+class _TransactionSheet
+    extends StatefulWidget {
   final List<String> incomeCategories;
   final List<String> expenseCategories;
   final List<String> accounts;
@@ -1235,12 +1688,15 @@ class _TransactionSheetState
   String? _selectedAccount;
   String? _targetAccount;
 
-  DateTime _selectedDate = DateTime.now();
+  DateTime _selectedDate =
+      DateTime.now();
 
-  final TextEditingController _amountController =
+  final TextEditingController
+      _amountController =
       TextEditingController();
 
-  final TextEditingController _noteController =
+  final TextEditingController
+      _noteController =
       TextEditingController();
 
   @override
@@ -1248,20 +1704,27 @@ class _TransactionSheetState
     super.initState();
 
     _incomeCategories =
-        List<String>.from(widget.incomeCategories);
+        List<String>.from(
+      widget.incomeCategories,
+    );
 
     _expenseCategories =
-        List<String>.from(widget.expenseCategories);
+        List<String>.from(
+      widget.expenseCategories,
+    );
 
-    _selectedCategory = _expenseCategories.isNotEmpty
-        ? _expenseCategories.first
-        : null;
+    _selectedCategory =
+        _expenseCategories.isNotEmpty
+            ? _expenseCategories.first
+            : null;
 
-    _selectedAccount = widget.accounts.first;
+    _selectedAccount =
+        widget.accounts.first;
 
-    _targetAccount = widget.accounts.length > 1
-        ? widget.accounts[1]
-        : widget.accounts.first;
+    _targetAccount =
+        widget.accounts.length > 1
+            ? widget.accounts[1]
+            : widget.accounts.first;
   }
 
   @override
@@ -1277,13 +1740,20 @@ class _TransactionSheetState
         : _expenseCategories;
   }
 
-  Future<void> _selectTransactionDate() async {
-    final picked = await showDatePicker(
+  // ============================================================
+  // SELECT TRANSACTION DATE
+  // ============================================================
+
+  Future<void>
+      _selectTransactionDate() async {
+    final picked =
+        await showDatePicker(
       context: context,
       initialDate: _selectedDate,
       firstDate: DateTime(2020),
       lastDate: DateTime(2100),
-      helpText: 'লেনদেনের তারিখ নির্বাচন করুন',
+      helpText:
+          'লেনদেনের তারিখ নির্বাচন করুন',
       cancelText: 'বাতিল',
       confirmText: 'নির্বাচন',
     );
@@ -1295,49 +1765,70 @@ class _TransactionSheetState
     });
   }
 
-  Future<void> _addCategory() async {
-    final controller = TextEditingController();
+  // ============================================================
+  // ADD CATEGORY
+  // ============================================================
 
-    final value = await showDialog<String>(
+  Future<void> _addCategory() async {
+    final controller =
+        TextEditingController();
+
+    final value =
+        await showDialog<String>(
       context: context,
       builder: (context) {
         return AlertDialog(
-          backgroundColor: AppTheme.cardColor,
+          backgroundColor:
+              AppTheme.cardColor,
           title: Text(
             _type == 'Income'
                 ? 'নতুন আয় খাত যোগ করুন'
                 : 'নতুন খরচের খাত যোগ করুন',
             style: TextStyle(
-              color: AppTheme.textPrimary,
-              fontWeight: FontWeight.w800,
+              color:
+                  AppTheme.textPrimary,
+              fontWeight:
+                  FontWeight.w800,
             ),
           ),
           content: TextField(
             controller: controller,
             autofocus: true,
             style: TextStyle(
-              color: AppTheme.textPrimary,
+              color:
+                  AppTheme.textPrimary,
             ),
-            decoration: const InputDecoration(
-              hintText: 'খাতের নাম লিখুন',
+            decoration:
+                const InputDecoration(
+              hintText:
+                  'খাতের নাম লিখুন',
             ),
           ),
           actions: [
             TextButton(
               onPressed: () {
-                Navigator.pop(context);
+                Navigator.pop(
+                  context,
+                );
               },
-              child: const Text('বাতিল'),
+              child:
+                  const Text('বাতিল'),
             ),
             ElevatedButton(
               onPressed: () {
-                final text = controller.text.trim();
+                final text =
+                    controller.text
+                        .trim();
 
                 if (text.isEmpty) return;
 
-                Navigator.pop(context, text);
+                Navigator.pop(
+                  context,
+                  text,
+                );
               },
-              child: const Text('যোগ করুন'),
+              child:
+                  const Text('যোগ করুন'),
             ),
           ],
         );
@@ -1346,13 +1837,18 @@ class _TransactionSheetState
 
     controller.dispose();
 
-    if (value == null || value.trim().isEmpty) return;
+    if (value == null ||
+        value.trim().isEmpty) {
+      return;
+    }
 
-    final category = value.trim();
+    final category =
+        value.trim();
 
-    final current = _type == 'Income'
-        ? _incomeCategories
-        : _expenseCategories;
+    final current =
+        _type == 'Income'
+            ? _incomeCategories
+            : _expenseCategories;
 
     final exists = current.any(
       (item) =>
@@ -1363,9 +1859,12 @@ class _TransactionSheetState
     if (exists) {
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
+      ScaffoldMessenger.of(context)
+          .showSnackBar(
         const SnackBar(
-          content: Text('এই খাতটি আগে থেকেই আছে'),
+          content: Text(
+            'এই খাতটি আগে থেকেই আছে',
+          ),
         ),
       );
 
@@ -1374,33 +1873,52 @@ class _TransactionSheetState
 
     setState(() {
       if (_type == 'Income') {
-        _incomeCategories.add(category);
+        _incomeCategories.add(
+          category,
+        );
       } else {
-        _expenseCategories.add(category);
+        _expenseCategories.add(
+          category,
+        );
       }
 
-      _selectedCategory = category;
+      _selectedCategory =
+          category;
     });
 
-    final prefs = await SharedPreferences.getInstance();
+    final prefs =
+        await SharedPreferences
+            .getInstance();
 
     if (_type == 'Income') {
-      final customIncome = _incomeCategories
-          .where(
-            (item) => !widget.incomeCategories.contains(item),
-          )
-          .toList();
+      final customIncome =
+          _incomeCategories
+              .where(
+                (item) =>
+                    !widget
+                        .incomeCategories
+                        .contains(
+                  item,
+                ),
+              )
+              .toList();
 
       await prefs.setStringList(
         'money_manager_custom_income_categories',
         customIncome,
       );
     } else {
-      final customExpense = _expenseCategories
-          .where(
-            (item) => !widget.expenseCategories.contains(item),
-          )
-          .toList();
+      final customExpense =
+          _expenseCategories
+              .where(
+                (item) =>
+                    !widget
+                        .expenseCategories
+                        .contains(
+                  item,
+                ),
+              )
+              .toList();
 
       await prefs.setStringList(
         'money_manager_custom_expense_categories',
@@ -1410,46 +1928,68 @@ class _TransactionSheetState
 
     if (!mounted) return;
 
-    ScaffoldMessenger.of(context).showSnackBar(
+    ScaffoldMessenger.of(context)
+        .showSnackBar(
       SnackBar(
-        content: Text('“$category” খাত যোগ হয়েছে'),
+        content: Text(
+          '“$category” খাত যোগ হয়েছে',
+        ),
       ),
     );
   }
 
+  // ============================================================
+  // SAVE TRANSACTION
+  // ============================================================
+
   Future<void> _save() async {
-    final amount = double.tryParse(
-      _amountController.text.trim().replaceAll(',', ''),
+    final amount =
+        double.tryParse(
+      _amountController.text
+          .trim()
+          .replaceAll(',', ''),
     );
 
-    if (amount == null || amount <= 0) {
-      _showMessage('সঠিক পরিমাণ লিখুন');
+    if (amount == null ||
+        amount <= 0) {
+      _showMessage(
+        'সঠিক পরিমাণ লিখুন',
+      );
       return;
     }
 
-    if (_selectedAccount == null) {
-      _showMessage('অ্যাকাউন্ট নির্বাচন করুন');
+    if (_selectedAccount ==
+        null) {
+      _showMessage(
+        'অ্যাকাউন্ট নির্বাচন করুন',
+      );
       return;
     }
 
     if (_type != 'Transfer' &&
         _selectedCategory == null) {
-      _showMessage('খাত নির্বাচন করুন');
+      _showMessage(
+        'খাত নির্বাচন করুন',
+      );
       return;
     }
 
     if (_type == 'Transfer' &&
-        _targetAccount == _selectedAccount) {
+        _targetAccount ==
+            _selectedAccount) {
       _showMessage(
         'একই অ্যাকাউন্টে ট্রান্সফার করা যাবে না',
       );
       return;
     }
 
-    final transaction = MoneyTransaction(
+    final transaction =
+        MoneyTransaction(
       type: _type,
       amount: amount,
-      date: DateFormat('dd/MM/yyyy').format(
+      date: DateFormat(
+        'dd/MM/yyyy',
+      ).format(
         _selectedDate,
       ),
       category: _type == 'Transfer'
@@ -1458,10 +1998,12 @@ class _TransactionSheetState
       account: _type == 'Transfer'
           ? '$_selectedAccount ➔ $_targetAccount'
           : _selectedAccount!,
-      note: _noteController.text.trim(),
+      note:
+          _noteController.text.trim(),
     );
 
-    await MoneyDbHelper.instance.insertTransaction(
+    await MoneyDbHelper.instance
+        .insertTransaction(
       transaction,
     );
 
@@ -1471,20 +2013,30 @@ class _TransactionSheetState
 
     Navigator.pop(context);
 
-    ScaffoldMessenger.of(context).showSnackBar(
+    ScaffoldMessenger.of(context)
+        .showSnackBar(
       const SnackBar(
-        content: Text('লেনদেন সফলভাবে সংরক্ষণ হয়েছে'),
+        content: Text(
+          'লেনদেন সফলভাবে সংরক্ষণ হয়েছে',
+        ),
       ),
     );
   }
 
-  void _showMessage(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
+  void _showMessage(
+    String message,
+  ) {
+    ScaffoldMessenger.of(context)
+        .showSnackBar(
       SnackBar(
         content: Text(message),
       ),
     );
   }
+
+  // ============================================================
+  // SHEET UI
+  // ============================================================
 
   @override
   Widget build(BuildContext context) {
@@ -1495,101 +2047,174 @@ class _TransactionSheetState
           right: 16,
           top: 10,
           bottom:
-              MediaQuery.of(context).viewInsets.bottom + 16,
+              MediaQuery.of(context)
+                      .viewInsets
+                      .bottom +
+                  16,
         ),
         decoration: BoxDecoration(
-          color: AppTheme.background,
-          borderRadius: const BorderRadius.vertical(
-            top: Radius.circular(26),
+          color:
+              AppTheme.background,
+          borderRadius:
+              const BorderRadius
+                  .vertical(
+            top:
+                Radius.circular(26),
           ),
         ),
-        child: SingleChildScrollView(
+        child:
+            SingleChildScrollView(
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+            crossAxisAlignment:
+                CrossAxisAlignment
+                    .start,
             children: [
               Center(
                 child: Container(
                   width: 42,
                   height: 4,
-                  decoration: BoxDecoration(
-                    color: AppTheme.textMuted,
-                    borderRadius: BorderRadius.circular(10),
+                  decoration:
+                      BoxDecoration(
+                    color:
+                        AppTheme.textMuted,
+                    borderRadius:
+                        BorderRadius
+                            .circular(
+                      10,
+                    ),
                   ),
                 ),
               ),
-              const SizedBox(height: 15),
+
+              const SizedBox(
+                height: 15,
+              ),
+
               Text(
                 'নতুন লেনদেন',
                 style: TextStyle(
-                  color: AppTheme.textPrimary,
+                  color:
+                      AppTheme.textPrimary,
                   fontSize: 20,
-                  fontWeight: FontWeight.w900,
+                  fontWeight:
+                      FontWeight.w900,
                 ),
               ),
-              const SizedBox(height: 15),
+
+              const SizedBox(
+                height: 15,
+              ),
+
               Row(
                 children: [
                   Expanded(
-                    child: _typeButton(
+                    child:
+                        _typeButton(
                       'Income',
                       'আয়',
-                      Icons.arrow_downward_rounded,
+                      Icons
+                          .arrow_downward_rounded,
                       Colors.blue,
                     ),
                   ),
-                  const SizedBox(width: 8),
+                  const SizedBox(
+                    width: 8,
+                  ),
                   Expanded(
-                    child: _typeButton(
+                    child:
+                        _typeButton(
                       'Expense',
                       'খরচ',
-                      Icons.arrow_upward_rounded,
+                      Icons
+                          .arrow_upward_rounded,
                       Colors.redAccent,
                     ),
                   ),
-                  const SizedBox(width: 8),
+                  const SizedBox(
+                    width: 8,
+                  ),
                   Expanded(
-                    child: _typeButton(
+                    child:
+                        _typeButton(
                       'Transfer',
                       'ট্রান্সফার',
-                      Icons.swap_horiz_rounded,
+                      Icons
+                          .swap_horiz_rounded,
                       AppTheme.gold,
                     ),
                   ),
                 ],
               ),
-              const SizedBox(height: 16),
+
+              const SizedBox(
+                height: 16,
+              ),
+
               _label('পরিমাণ'),
-              const SizedBox(height: 6),
+
+              const SizedBox(
+                height: 6,
+              ),
+
               TextField(
-                controller: _amountController,
+                controller:
+                    _amountController,
                 keyboardType:
-                    const TextInputType.numberWithOptions(
+                    const TextInputType
+                        .numberWithOptions(
                   decimal: true,
                 ),
                 style: TextStyle(
-                  color: AppTheme.textPrimary,
+                  color:
+                      AppTheme.textPrimary,
                 ),
-                decoration: const InputDecoration(
-                  hintText: 'যেমন: 5000',
+                decoration:
+                    const InputDecoration(
+                  hintText:
+                      'যেমন: 5000',
                   prefixText: '৳ ',
                 ),
               ),
-              const SizedBox(height: 13),
-              _label('লেনদেনের তারিখ'),
-              const SizedBox(height: 6),
+
+              const SizedBox(
+                height: 13,
+              ),
+
+              _label(
+                'লেনদেনের তারিখ',
+              ),
+
+              const SizedBox(
+                height: 6,
+              ),
+
               GestureDetector(
-                onTap: _selectTransactionDate,
-                child: Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.symmetric(
+                onTap:
+                    _selectTransactionDate,
+                child:
+                    Container(
+                  width:
+                      double.infinity,
+                  padding:
+                      const EdgeInsets
+                          .symmetric(
                     horizontal: 14,
                     vertical: 15,
                   ),
-                  decoration: BoxDecoration(
-                    color: AppTheme.cardColor,
-                    borderRadius: BorderRadius.circular(13),
-                    border: Border.all(
-                      color: AppTheme.gold.withValues(
+                  decoration:
+                      BoxDecoration(
+                    color:
+                        AppTheme.cardColor,
+                    borderRadius:
+                        BorderRadius
+                            .circular(
+                      13,
+                    ),
+                    border:
+                        Border.all(
+                      color: AppTheme
+                          .gold
+                          .withValues(
                         alpha: 0.25,
                       ),
                     ),
@@ -1597,134 +2222,262 @@ class _TransactionSheetState
                   child: Row(
                     children: [
                       Icon(
-                        Icons.calendar_month_rounded,
-                        color: AppTheme.gold,
+                        Icons
+                            .calendar_month_rounded,
+                        color:
+                            AppTheme.gold,
                       ),
-                      const SizedBox(width: 10),
+                      const SizedBox(
+                        width: 10,
+                      ),
                       Expanded(
-                        child: Text(
-                          DateFormat('dd/MM/yyyy').format(
+                        child:
+                            Text(
+                          DateFormat(
+                            'dd/MM/yyyy',
+                          ).format(
                             _selectedDate,
                           ),
-                          style: TextStyle(
-                            color: AppTheme.textPrimary,
+                          style:
+                              TextStyle(
+                            color:
+                                AppTheme
+                                    .textPrimary,
                             fontSize: 13,
-                            fontWeight: FontWeight.w700,
+                            fontWeight:
+                                FontWeight
+                                    .w700,
                           ),
                         ),
                       ),
                       Icon(
-                        Icons.arrow_drop_down_rounded,
-                        color: AppTheme.textMuted,
+                        Icons
+                            .arrow_drop_down_rounded,
+                        color:
+                            AppTheme.textMuted,
                       ),
                     ],
                   ),
                 ),
               ),
-              const SizedBox(height: 13),
+
+              const SizedBox(
+                height: 13,
+              ),
+
               _label(
                 _type == 'Transfer'
                     ? 'যে অ্যাকাউন্ট থেকে'
                     : 'অ্যাকাউন্ট',
               ),
-              const SizedBox(height: 6),
-              DropdownButtonFormField<String>(
-                value: _selectedAccount,
+
+              const SizedBox(
+                height: 6,
+              ),
+
+              DropdownButtonFormField<
+                  String>(
+                value:
+                    _selectedAccount,
                 isExpanded: true,
-                decoration: const InputDecoration(),
-                items: widget.accounts.map((account) {
-                  return DropdownMenuItem<String>(
-                    value: account,
-                    child: Text(account),
-                  );
-                }).toList(),
-                onChanged: (value) {
+                decoration:
+                    const InputDecoration(),
+                items: widget
+                    .accounts
+                    .map(
+                      (
+                        account,
+                      ) {
+                        return DropdownMenuItem<
+                            String>(
+                          value:
+                              account,
+                          child:
+                              Text(
+                            account,
+                          ),
+                        );
+                      },
+                    )
+                    .toList(),
+                onChanged:
+                    (value) {
                   setState(() {
-                    _selectedAccount = value;
+                    _selectedAccount =
+                        value;
                   });
                 },
               ),
-              if (_type == 'Transfer') ...[
-                const SizedBox(height: 13),
-                _label('যে অ্যাকাউন্টে'),
-                const SizedBox(height: 6),
-                DropdownButtonFormField<String>(
-                  value: _targetAccount,
-                  isExpanded: true,
-                  decoration: const InputDecoration(),
-                  items: widget.accounts.map((account) {
-                    return DropdownMenuItem<String>(
-                      value: account,
-                      child: Text(account),
-                    );
-                  }).toList(),
-                  onChanged: (value) {
+
+              if (_type ==
+                  'Transfer') ...[
+                const SizedBox(
+                  height: 13,
+                ),
+
+                _label(
+                  'যে অ্যাকাউন্টে',
+                ),
+
+                const SizedBox(
+                  height: 6,
+                ),
+
+                DropdownButtonFormField<
+                    String>(
+                  value:
+                      _targetAccount,
+                  isExpanded:
+                      true,
+                  decoration:
+                      const InputDecoration(),
+                  items: widget
+                      .accounts
+                      .map(
+                        (
+                          account,
+                        ) {
+                          return DropdownMenuItem<
+                              String>(
+                            value:
+                                account,
+                            child:
+                                Text(
+                              account,
+                            ),
+                          );
+                        },
+                      )
+                      .toList(),
+                  onChanged:
+                      (value) {
                     setState(() {
-                      _targetAccount = value;
+                      _targetAccount =
+                          value;
                     });
                   },
                 ),
               ],
-              if (_type != 'Transfer') ...[
-                const SizedBox(height: 13),
+
+              if (_type !=
+                  'Transfer') ...[
+                const SizedBox(
+                  height: 13,
+                ),
+
                 Row(
                   children: [
                     Expanded(
-                      child: _label('খাত'),
+                      child: _label(
+                        'খাত',
+                      ),
                     ),
                     TextButton.icon(
-                      onPressed: _addCategory,
-                      icon: const Icon(
+                      onPressed:
+                          _addCategory,
+                      icon:
+                          const Icon(
                         Icons.add_rounded,
                         size: 17,
                       ),
-                      label: const Text('নতুন খাত'),
+                      label:
+                          const Text(
+                        'নতুন খাত',
+                      ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 2),
-                DropdownButtonFormField<String>(
-                  value: _selectedCategory,
-                  isExpanded: true,
-                  decoration: const InputDecoration(),
-                  items: _currentCategories.map((category) {
-                    return DropdownMenuItem<String>(
-                      value: category,
-                      child: Text(category),
-                    );
-                  }).toList(),
-                  onChanged: (value) {
+
+                const SizedBox(
+                  height: 2,
+                ),
+
+                DropdownButtonFormField<
+                    String>(
+                  value:
+                      _selectedCategory,
+                  isExpanded:
+                      true,
+                  decoration:
+                      const InputDecoration(),
+                  items: _currentCategories
+                      .map(
+                        (
+                          category,
+                        ) {
+                          return DropdownMenuItem<
+                              String>(
+                            value:
+                                category,
+                            child:
+                                Text(
+                              category,
+                            ),
+                          );
+                        },
+                      )
+                      .toList(),
+                  onChanged:
+                      (value) {
                     setState(() {
-                      _selectedCategory = value;
+                      _selectedCategory =
+                          value;
                     });
                   },
                 ),
               ],
-              const SizedBox(height: 13),
+
+              const SizedBox(
+                height: 13,
+              ),
+
               _label('নোট'),
-              const SizedBox(height: 6),
+
+              const SizedBox(
+                height: 6,
+              ),
+
               TextField(
-                controller: _noteController,
+                controller:
+                    _noteController,
                 maxLines: 3,
                 style: TextStyle(
-                  color: AppTheme.textPrimary,
+                  color:
+                      AppTheme.textPrimary,
                 ),
-                decoration: const InputDecoration(
-                  hintText: 'প্রয়োজনে নোট লিখুন',
+                decoration:
+                    const InputDecoration(
+                  hintText:
+                      'প্রয়োজনে নোট লিখুন',
                 ),
               ),
-              const SizedBox(height: 18),
+
+              const SizedBox(
+                height: 18,
+              ),
+
               SizedBox(
-                width: double.infinity,
+                width:
+                    double.infinity,
                 height: 52,
-                child: ElevatedButton.icon(
-                  onPressed: _save,
-                  icon: const Icon(Icons.save_rounded),
-                  label: const Text(
+                child:
+                    ElevatedButton.icon(
+                  onPressed:
+                      _save,
+                  icon:
+                      const Icon(
+                    Icons
+                        .save_rounded,
+                  ),
+                  label:
+                      const Text(
                     'সংরক্ষণ করুন',
-                    style: TextStyle(
+                    style:
+                        TextStyle(
                       fontSize: 15,
-                      fontWeight: FontWeight.w800,
+                      fontWeight:
+                          FontWeight
+                              .w800,
                     ),
                   ),
                 ),
@@ -1736,16 +2489,28 @@ class _TransactionSheetState
     );
   }
 
-  Widget _label(String text) {
+  // ============================================================
+  // LABEL
+  // ============================================================
+
+  Widget _label(
+    String text,
+  ) {
     return Text(
       text,
       style: TextStyle(
-        color: AppTheme.textPrimary,
+        color:
+            AppTheme.textPrimary,
         fontSize: 12.5,
-        fontWeight: FontWeight.w700,
+        fontWeight:
+            FontWeight.w700,
       ),
     );
   }
+
+  // ============================================================
+  // TYPE BUTTON
+  // ============================================================
 
   Widget _typeButton(
     String type,
@@ -1753,7 +2518,8 @@ class _TransactionSheetState
     IconData icon,
     Color color,
   ) {
-    final selected = _type == type;
+    final selected =
+        _type == type;
 
     return GestureDetector(
       onTap: () {
@@ -1762,55 +2528,83 @@ class _TransactionSheetState
 
           if (type == 'Income') {
             _selectedCategory =
-                _incomeCategories.isNotEmpty
-                    ? _incomeCategories.first
+                _incomeCategories
+                        .isNotEmpty
+                    ? _incomeCategories
+                        .first
                     : null;
-          } else if (type == 'Expense') {
+          } else if (type ==
+              'Expense') {
             _selectedCategory =
-                _expenseCategories.isNotEmpty
-                    ? _expenseCategories.first
+                _expenseCategories
+                        .isNotEmpty
+                    ? _expenseCategories
+                        .first
                     : null;
           } else {
-            _selectedCategory = null;
+            _selectedCategory =
+                null;
           }
         });
       },
-      child: Container(
-        padding: const EdgeInsets.symmetric(
+      child:
+          Container(
+        padding:
+            const EdgeInsets
+                .symmetric(
           vertical: 11,
           horizontal: 5,
         ),
-        decoration: BoxDecoration(
+        decoration:
+            BoxDecoration(
           color: selected
-              ? color.withValues(alpha: 0.16)
-              : AppTheme.cardColor,
-          borderRadius: BorderRadius.circular(13),
-          border: Border.all(
+              ? color.withValues(
+                  alpha: 0.16,
+                )
+              : AppTheme
+                  .cardColor,
+          borderRadius:
+              BorderRadius
+                  .circular(
+            13,
+          ),
+          border:
+              Border.all(
             color: selected
                 ? color
-                : AppTheme.textMuted.withValues(
-                    alpha: 0.18,
-                  ),
+                : AppTheme
+                    .textMuted
+                    .withValues(
+              alpha: 0.18,
+            ),
           ),
         ),
-        child: Column(
+        child:
+            Column(
           children: [
             Icon(
               icon,
               color: selected
                   ? color
-                  : AppTheme.textMuted,
+                  : AppTheme
+                      .textMuted,
               size: 20,
             ),
-            const SizedBox(height: 4),
+            const SizedBox(
+              height: 4,
+            ),
             Text(
               title,
-              style: TextStyle(
+              style:
+                  TextStyle(
                 color: selected
                     ? color
-                    : AppTheme.textMuted,
+                    : AppTheme
+                        .textMuted,
                 fontSize: 11,
-                fontWeight: FontWeight.w800,
+                fontWeight:
+                    FontWeight
+                        .w800,
               ),
             ),
           ],
