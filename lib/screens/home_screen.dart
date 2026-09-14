@@ -327,6 +327,10 @@ class HomeScreen extends StatelessWidget {
                                 },
                               ),
 
+                              // EMPTY SPACE
+                              // "অ্যাপ সম্পর্কে" বাটনকে মাঝখানে রাখার জন্য
+                              const SizedBox.shrink(),
+
                               // 10 — অ্যাপ সম্পর্কে
                               _MenuCard(
                                 icon: Icons.info_outline_rounded,
@@ -357,10 +361,7 @@ class HomeScreen extends StatelessWidget {
   }
 }
 
-// ═══════════════════════════════════════════════════════════════
 // PREMIUM MENU CARD
-// ═══════════════════════════════════════════════════════════════
-
 class _MenuCard extends StatelessWidget {
   final IconData icon;
   final String title;
@@ -514,10 +515,7 @@ class _MenuCard extends StatelessWidget {
   }
 }
 
-// ═══════════════════════════════════════════════════════════════
 // ISLAMIC GEOMETRIC BACKGROUND
-// ═══════════════════════════════════════════════════════════════
-
 class IslamicBackgroundPainter extends CustomPainter {
   final Color color;
 
