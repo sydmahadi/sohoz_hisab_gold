@@ -48,7 +48,7 @@ jobs:
 
           text = re.sub(
               r'android:label="[^"]*"',
-              'android:label="সহজ হিসাব প্লাস"',
+              'android:label="সহজ হিসাব গোল্ড"',
               text,
               count=1
           )
