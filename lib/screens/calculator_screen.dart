@@ -24,28 +24,38 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
       } else if (value == '=') {
         _calculateResult();
       } else {
-        // পরপর দুটি অপারেটর ইনপুট দেওয়া প্রতিরোধ
         if (_isOperator(value) && _input.isNotEmpty) {
-          String lastChar = _input[_input.length - 1];
+          final lastChar = _input[_input.length - 1];
+
           if (_isOperator(lastChar)) {
-            _input = _input.substring(0, _input.length - 1) + value;
+            _input =
+                _input.substring(0, _input.length - 1) + value;
             return;
           }
         }
+
         _input += value;
       }
     });
   }
 
   bool _isOperator(String ch) {
-    return ch == '+' || ch == '-' || ch == '×' || ch == '÷' || ch == '%';
+    return ch == '+' ||
+        ch == '-' ||
+        ch == '×' ||
+        ch == '÷' ||
+        ch == '%';
   }
 
   void _calculateResult() {
     if (_input.isEmpty) return;
+
     try {
-      String finalInput = _input.replaceAll('×', '*').replaceAll('÷', '/');
-      double calculated = _evaluateMath(finalInput);
+      final finalInput = _input
+          .replaceAll('×', '*')
+          .replaceAll('÷', '/');
+
+      final calculated = _evaluateMath(finalInput);
 
       if (calculated.isNaN || calculated.isInfinite) {
         _result = 'ত্রুটি';
@@ -62,33 +72,40 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
     }
   }
 
-  // গাণিতিক সমীকরণ সঠিকভাবে সমাধান করার এলগরিদম
   double _evaluateMath(String expression) {
-    List<String> tokens = [];
+    final List<String> tokens = [];
     String numberBuffer = '';
 
     for (int i = 0; i < expression.length; i++) {
-      String char = expression[i];
+      final char = expression[i];
+
       if ('+-*/%'.contains(char)) {
         if (numberBuffer.isNotEmpty) {
           tokens.add(numberBuffer);
           numberBuffer = '';
         }
+
         tokens.add(char);
       } else {
         numberBuffer += char;
       }
     }
-    if (numberBuffer.isNotEmpty) tokens.add(numberBuffer);
+
+    if (numberBuffer.isNotEmpty) {
+      tokens.add(numberBuffer);
+    }
 
     if (tokens.isEmpty) return 0;
 
-    // ১ম ধাপ: পার্সেন্টেজ (%) হ্যান্ডেল করা (সংখ্যা/১০০)
-    List<String> pass1 = [];
+    // Percentage calculation
+    final List<String> pass1 = [];
+
     for (int i = 0; i < tokens.length; i++) {
       if (tokens[i] == '%') {
         if (pass1.isNotEmpty) {
-          double prevNum = double.tryParse(pass1.removeLast()) ?? 0;
+          final prevNum =
+              double.tryParse(pass1.removeLast()) ?? 0;
+
           pass1.add((prevNum / 100).toString());
         }
       } else {
@@ -96,17 +113,30 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
       }
     }
 
-    // ২য় ধাপ: গুণ (*) এবং ভাগ (/) সমাধান করা
-    List<String> pass2 = [];
+    // Multiplication and division
+    final List<String> pass2 = [];
     int i = 0;
+
     while (i < pass1.length) {
       if (pass1[i] == '*' || pass1[i] == '/') {
-        String op = pass1[i];
-        double prev = double.tryParse(pass2.removeLast()) ?? 0;
-        double next = double.tryParse(pass1[i + 1]) ?? 0;
+        final op = pass1[i];
+
+        final prev =
+            double.tryParse(pass2.removeLast()) ?? 0;
+
+        final next =
+            double.tryParse(pass1[i + 1]) ?? 0;
+
         double eval = 0;
-        if (op == '*') eval = prev * next;
-        if (op == '/') eval = next != 0 ? prev / next : double.nan;
+
+        if (op == '*') {
+          eval = prev * next;
+        }
+
+        if (op == '/') {
+          eval = next != 0 ? prev / next : double.nan;
+        }
+
         pass2.add(eval.toString());
         i += 2;
       } else {
@@ -115,15 +145,27 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
       }
     }
 
-    // ৩য় ধাপ: যোগ (+) এবং বিয়োগ (-) সমাধান করা
+    // Addition and subtraction
     if (pass2.isEmpty) return 0;
-    double result = double.tryParse(pass2[0]) ?? 0;
+
+    double result =
+        double.tryParse(pass2[0]) ?? 0;
+
     int j = 1;
+
     while (j < pass2.length) {
-      String op = pass2[j];
-      double next = double.tryParse(pass2[j + 1]) ?? 0;
-      if (op == '+') result += next;
-      if (op == '-') result -= next;
+      final op = pass2[j];
+      final next =
+          double.tryParse(pass2[j + 1]) ?? 0;
+
+      if (op == '+') {
+        result += next;
+      }
+
+      if (op == '-') {
+        result -= next;
+      }
+
       j += 2;
     }
 
@@ -133,11 +175,26 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
   @override
   Widget build(BuildContext context) {
     final List<String> buttons = [
-      'C', '÷', '×', '⌫',
-      '7', '8', '9', '-',
-      '4', '5', '6', '+',
-      '1', '2', '3', '%',
-      '00', '0', '.', '='
+      'C',
+      '÷',
+      '×',
+      '⌫',
+      '7',
+      '8',
+      '9',
+      '-',
+      '4',
+      '5',
+      '6',
+      '+',
+      '1',
+      '2',
+      '3',
+      '%',
+      '00',
+      '0',
+      '.',
+      '=',
     ];
 
     return Scaffold(
@@ -148,23 +205,35 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
       body: SafeArea(
         child: Column(
           children: [
-            // ডিসপ্লে পার্ট
+            // Display section
             Expanded(
               flex: 3,
               child: Container(
                 width: double.infinity,
-                margin: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                margin: const EdgeInsets.fromLTRB(
+                  16,
+                  12,
+                  16,
+                  12,
+                ),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 16,
+                ),
                 decoration: BoxDecoration(
                   color: AppTheme.cardColor,
                   borderRadius: BorderRadius.circular(24),
                   border: Border.all(
-                    color: AppTheme.gold.withValues(alpha: 0.5),
+                    color: AppTheme.gold.withValues(
+                      alpha: 0.5,
+                    ),
                     width: 1,
                   ),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.3),
+                      color: Colors.black.withValues(
+                        alpha: 0.3,
+                      ),
                       blurRadius: 15,
                       offset: const Offset(0, 8),
                     ),
@@ -179,7 +248,7 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
                       reverse: true,
                       child: Text(
                         _input.isEmpty ? '0' : _input,
-                        style: const TextStyle(
+                        style: TextStyle(
                           color: AppTheme.textMuted,
                           fontSize: 26,
                           fontWeight: FontWeight.w500,
@@ -192,7 +261,7 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
                       reverse: true,
                       child: Text(
                         _result,
-                        style: const TextStyle(
+                        style: TextStyle(
                           color: AppTheme.goldLight,
                           fontSize: 40,
                           fontWeight: FontWeight.bold,
@@ -204,15 +273,22 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
               ),
             ),
 
-            // কিপ্যাড পার্ট
+            // Keypad section
             Expanded(
               flex: 6,
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                padding: const EdgeInsets.fromLTRB(
+                  16,
+                  0,
+                  16,
+                  16,
+                ),
                 child: GridView.builder(
-                  physics: const NeverScrollableScrollPhysics(),
+                  physics:
+                      const NeverScrollableScrollPhysics(),
                   itemCount: buttons.length,
-                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  gridDelegate:
+                      const SliverGridDelegateWithFixedCrossAxisCount(
                     crossAxisCount: 4,
                     crossAxisSpacing: 10,
                     mainAxisSpacing: 10,
@@ -221,9 +297,19 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
                   itemBuilder: (context, index) {
                     final btn = buttons[index];
 
-                    bool isOperator = ['÷', '×', '-', '+', '%'].contains(btn);
-                    bool isEqual = btn == '=';
-                    bool isClear = ['C', '⌫'].contains(btn);
+                    final isOperator = [
+                      '÷',
+                      '×',
+                      '-',
+                      '+',
+                      '%',
+                    ].contains(btn);
+
+                    final isEqual = btn == '=';
+                    final isClear = [
+                      'C',
+                      '⌫',
+                    ].contains(btn);
 
                     Color btnBg = AppTheme.cardLight;
                     Color textColor = AppTheme.textDark;
@@ -235,7 +321,9 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
                       btnBg = AppTheme.primaryLight;
                       textColor = AppTheme.goldLight;
                     } else if (isClear) {
-                      btnBg = AppTheme.danger.withValues(alpha: 0.85);
+                      btnBg = AppTheme.danger.withValues(
+                        alpha: 0.85,
+                      );
                       textColor = Colors.white;
                     }
 
@@ -243,18 +331,28 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
                       color: Colors.transparent,
                       borderRadius: BorderRadius.circular(16),
                       child: InkWell(
-                        onTap: () => _onButtonPressed(btn),
-                        borderRadius: BorderRadius.circular(16),
-                        splashColor: AppTheme.gold.withValues(alpha: 0.25),
+                        onTap: () =>
+                            _onButtonPressed(btn),
+                        borderRadius:
+                            BorderRadius.circular(16),
+                        splashColor:
+                            AppTheme.gold.withValues(
+                          alpha: 0.25,
+                        ),
                         child: Ink(
                           decoration: BoxDecoration(
                             color: btnBg,
-                            borderRadius: BorderRadius.circular(16),
+                            borderRadius:
+                                BorderRadius.circular(16),
                             border: Border.all(
                               color: isOperator || isEqual
                                   ? AppTheme.gold
-                                  : AppTheme.gold.withValues(alpha: 0.25),
-                              width: isOperator || isEqual ? 1 : 0.6,
+                                  : AppTheme.gold.withValues(
+                                      alpha: 0.25,
+                                    ),
+                              width: isOperator || isEqual
+                                  ? 1
+                                  : 0.6,
                             ),
                           ),
                           child: Center(
