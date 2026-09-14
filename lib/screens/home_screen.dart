@@ -1,8 +1,8 @@
 import 'dart:math';
-
 import 'package:flutter/material.dart';
 
 import '../theme/app_theme.dart';
+import 'money_manager_screen.dart'; // মানি ম্যানেজার স্ক্রিন ইমপোর্ট
 import 'entry_screen.dart';
 import 'info_screen.dart';
 import 'note_screen.dart';
@@ -20,6 +20,11 @@ class HomeScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final List<_MenuItem> items = [
+      _MenuItem(
+        title: 'মানি ম্যানেজার',
+        icon: Icons.account_balance_wallet_rounded,
+        screen: const MoneyManagerScreen(),
+      ),
       _MenuItem(
         title: 'এন্ট্রি করুন',
         icon: Icons.edit_note_rounded,
