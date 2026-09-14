@@ -1765,15 +1765,3 @@ class _ReportScreenState extends State<ReportScreen> {
     );
   }
 }
-
-এখন যা করবে
-
-1. পুরোনো "lib/screens/report_screen.dart" পুরো delete করো।
-2. উপরের code পুরো paste করো।
-3. GitHub-এ commit করো।
-4. GitHub Actions থেকে আবার APK build করো।
-5. নতুন APK install করে Money Manager → Report এ যাও।
-
-একটা গুরুত্বপূর্ণ পরিবর্তন করেছি: তোমার database-এ "Income", "income", "EXPENSE", "expense"—যেভাবেই type save থাকুক, Report এখন case-insensitive ভাবে ধরবে। তাই আগের মতো data থাকার পরও আয়/ব্যয় "0" দেখানোর সম্ভাবনাও কমবে।
-
-আর app-এর নামও report থেকে “সহজ হিসাব” করেছি—Gold শুধু design-এর color হিসেবে থাকবে।
