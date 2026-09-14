@@ -12,14 +12,14 @@ class MoneyManagerScreen extends StatefulWidget {
 }
 
 class _MoneyManagerScreenState extends State<MoneyManagerScreen> {
-  int _currentIndex = 0; // Trans. ভিউ দেখার জন্য ০ সেট করা
+  int _currentIndex = 0;
   int _statsTab = 1; // 0 = Income, 1 = Expenses
   DateTime _selectedDate = DateTime.now();
   String _filterType = 'Monthly';
 
   List<MoneyTransaction> _transactions = [];
 
-  // Expense (খরচ) ক্যাটাগরি তালিকা
+  // Expense ক্যাটাগরি তালিকা
   List<String> _expenseCategories = [
     'উর্ধ্বতন এয়ানত',
     'যাতায়াত',
@@ -46,7 +46,7 @@ class _MoneyManagerScreenState extends State<MoneyManagerScreen> {
     'ফাউন্ডেশন',
   ];
 
-  // Income (আয়) ক্যাটাগরি তালিকা
+  // Income ক্যাটাগরি তালিকা
   List<String> _incomeCategories = [
     'জনশক্তি',
     'শুভাকাঙ্খী এয়ানত',
@@ -79,6 +79,60 @@ class _MoneyManagerScreenState extends State<MoneyManagerScreen> {
     setState(() {
       _transactions = data;
     });
+  }
+
+  // তারিখ রূপান্তরের হেলপার
+  DateTime? _parseDate(String dateStr) {
+    try {
+      return DateFormat('dd/MM/yyyy').parse(dateStr);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  // নির্দিষ্ট অ্যাকাউন্ট অনুযায়ী প্লাস-মাইনাস করে ব্যালেন্স হিসাব করার ফাংশন
+  double _calculateAccountBalance(String accountName) {
+    double balance = 0.0;
+    for (var item in _transactions) {
+      if (item.type == 'Income' && item.account == accountName) {
+        balance += item.amount;
+      } else if (item.type == 'Expense' && item.account == accountName) {
+        balance -= item.amount;
+      } else if (item.type == 'Transfer') {
+        // Transfer এর ক্ষেত্রে "FromAccount ➔ ToAccount" ফরম্যাট চেক
+        if (item.account.startsWith('$accountName ➔')) {
+          balance -= item.amount;
+        } else if (item.account.endsWith('➔ $accountName')) {
+          balance += item.amount;
+        }
+      }
+    }
+    return balance;
+  }
+
+  // Stats ফিল্টারিং
+  List<MoneyTransaction> _getFilteredTransactions() {
+    return _transactions.where((item) {
+      DateTime? itemDate = _parseDate(item.date);
+      if (itemDate == null) return false;
+
+      if (_filterType == 'Monthly') {
+        return itemDate.year == _selectedDate.year &&
+            itemDate.month == _selectedDate.month;
+      } else if (_filterType == 'Yearly') {
+        return itemDate.year == _selectedDate.year;
+      } else if (_filterType == 'Daily') {
+        return itemDate.year == _selectedDate.year &&
+            itemDate.month == _selectedDate.month &&
+            itemDate.day == _selectedDate.day;
+      } else if (_filterType == 'Weekly') {
+        final startOfWeek = _selectedDate.subtract(Duration(days: _selectedDate.weekday - 1));
+        final endOfWeek = startOfWeek.add(const Duration(days: 6));
+        return itemDate.isAfter(startOfWeek.subtract(const Duration(days: 1))) &&
+            itemDate.isBefore(endOfWeek.add(const Duration(days: 1)));
+      }
+      return true;
+    }).toList();
   }
 
   @override
@@ -151,7 +205,7 @@ class _MoneyManagerScreenState extends State<MoneyManagerScreen> {
     );
   }
 
-  // --- 1. Date Wise Grouped Transactions View ---
+  // --- 1. Transactions View (Grouped by Date) ---
   Widget _buildTransView() {
     double totalIncome = _transactions
         .where((e) => e.type == 'Income')
@@ -161,7 +215,6 @@ class _MoneyManagerScreenState extends State<MoneyManagerScreen> {
         .fold(0, (sum, item) => sum + item.amount);
     double balance = totalIncome - totalExpense;
 
-    // তারিখ অনুযায়ী লেনদেন গ্রুপিং করা
     Map<String, List<MoneyTransaction>> groupedTrans = {};
     for (var trans in _transactions) {
       if (!groupedTrans.containsKey(trans.date)) {
@@ -174,7 +227,6 @@ class _MoneyManagerScreenState extends State<MoneyManagerScreen> {
 
     return Column(
       children: [
-        // টপ সামারি কার্ড
         Container(
           padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
           color: AppTheme.cardLight,
@@ -208,7 +260,6 @@ class _MoneyManagerScreenState extends State<MoneyManagerScreen> {
                     return Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        // তারিখ অনুযায়ী হেডার (Date Group Header)
                         Container(
                           padding: const EdgeInsets.symmetric(
                               horizontal: 16, vertical: 8),
@@ -247,7 +298,6 @@ class _MoneyManagerScreenState extends State<MoneyManagerScreen> {
                             ],
                           ),
                         ),
-                        // ওই নির্দিষ্ট তারিখের সব লেনদেন
                         ...dayTrans.map((item) {
                           bool isIncome = item.type == 'Income';
                           bool isTransfer = item.type == 'Transfer';
@@ -308,16 +358,18 @@ class _MoneyManagerScreenState extends State<MoneyManagerScreen> {
     );
   }
 
-  // --- 2. Stats View ---
+  // --- 2. Dynamic Stats View ---
   Widget _buildStatsView() {
-    double totalIncome = _transactions
+    List<MoneyTransaction> filteredTrans = _getFilteredTransactions();
+
+    double totalIncome = filteredTrans
         .where((e) => e.type == 'Income')
         .fold(0, (sum, item) => sum + item.amount);
-    double totalExpense = _transactions
+    double totalExpense = filteredTrans
         .where((e) => e.type == 'Expense')
         .fold(0, (sum, item) => sum + item.amount);
 
-    final currentList = _transactions
+    final currentList = filteredTrans
         .where((e) => e.type == (_statsTab == 0 ? 'Income' : 'Expense'))
         .toList();
 
@@ -356,13 +408,19 @@ class _MoneyManagerScreenState extends State<MoneyManagerScreen> {
                     icon: const Icon(Icons.chevron_left, color: Colors.white),
                     onPressed: () {
                       setState(() {
-                        _selectedDate = DateTime(_selectedDate.year,
-                            _selectedDate.month - 1, _selectedDate.day);
+                        if (_filterType == 'Yearly') {
+                          _selectedDate = DateTime(_selectedDate.year - 1);
+                        } else {
+                          _selectedDate = DateTime(_selectedDate.year,
+                              _selectedDate.month - 1, _selectedDate.day);
+                        }
                       });
                     },
                   ),
                   Text(
-                    DateFormat('MMM yyyy').format(_selectedDate),
+                    _filterType == 'Yearly'
+                        ? DateFormat('yyyy').format(_selectedDate)
+                        : DateFormat('MMM yyyy').format(_selectedDate),
                     style: const TextStyle(
                       color: Colors.white,
                       fontSize: 16,
@@ -373,8 +431,12 @@ class _MoneyManagerScreenState extends State<MoneyManagerScreen> {
                     icon: const Icon(Icons.chevron_right, color: Colors.white),
                     onPressed: () {
                       setState(() {
-                        _selectedDate = DateTime(_selectedDate.year,
-                            _selectedDate.month + 1, _selectedDate.day);
+                        if (_filterType == 'Yearly') {
+                          _selectedDate = DateTime(_selectedDate.year + 1);
+                        } else {
+                          _selectedDate = DateTime(_selectedDate.year,
+                              _selectedDate.month + 1, _selectedDate.day);
+                        }
                       });
                     },
                   ),
@@ -430,7 +492,7 @@ class _MoneyManagerScreenState extends State<MoneyManagerScreen> {
                     Container(
                       height: 3,
                       color:
-                          _statsTab == 0 ? Colors.redAccent : Colors.transparent,
+                          _statsTab == 0 ? Colors.blue : Colors.transparent,
                     )
                   ],
                 ),
@@ -465,14 +527,14 @@ class _MoneyManagerScreenState extends State<MoneyManagerScreen> {
         Expanded(
           child: sortedEntries.isEmpty
               ? const Center(
-                  child: Text("কোনো তথ্য রেকর্ড করা নেই",
+                  child: Text("এই সময়সীমার কোনো তথ্য পাওয়া যায়নি",
                       style: TextStyle(color: Colors.white54)),
                 )
               : Column(
                   children: [
                     const SizedBox(height: 20),
                     SizedBox(
-                      height: 220,
+                      height: 200,
                       child: PieChart(
                         PieChartData(
                           sectionsSpace: 2,
@@ -489,7 +551,7 @@ class _MoneyManagerScreenState extends State<MoneyManagerScreen> {
                               value: item.value,
                               title:
                                   '${item.key}\n${percentage.toStringAsFixed(1)}%',
-                              radius: 100,
+                              radius: 95,
                               titleStyle: const TextStyle(
                                 color: Colors.white,
                                 fontWeight: FontWeight.bold,
@@ -568,12 +630,14 @@ class _MoneyManagerScreenState extends State<MoneyManagerScreen> {
     );
   }
 
-  // --- 3. Accounts View ---
+  // --- 3. Live Balance Dynamic Accounts View ---
   Widget _buildAccountsView() {
     return ListView.builder(
       itemCount: _accounts.length,
       itemBuilder: (context, index) {
         final acc = _accounts[index];
+        final double currentBalance = _calculateAccountBalance(acc);
+
         return Container(
           margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
           decoration: BoxDecoration(
@@ -586,6 +650,13 @@ class _MoneyManagerScreenState extends State<MoneyManagerScreen> {
             title: Text(acc,
                 style: const TextStyle(
                     color: Colors.white, fontWeight: FontWeight.bold)),
+            subtitle: Text(
+              'ব্যালেন্স: ৳ ${currentBalance.toStringAsFixed(2)}',
+              style: TextStyle(
+                color: currentBalance >= 0 ? Colors.greenAccent : Colors.redAccent,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
             trailing: IconButton(
               icon: const Icon(Icons.edit, color: Colors.grey),
               onPressed: () => _showEditAccountDialog(index),
@@ -655,6 +726,8 @@ class _MoneyManagerScreenState extends State<MoneyManagerScreen> {
   void _showAddTransactionModal(BuildContext context) {
     String type = 'Expense';
     String selectedCategory = _expenseCategories.first;
+    String selectedAccount = _accounts.first; // সিলেক্ট করা মেইন অ্যাকাউন্ট
+    String targetAccount = _accounts.length > 1 ? _accounts[1] : _accounts.first; // Transfer এর জন্য
     double amount = 0;
     String note = '';
 
@@ -665,14 +738,9 @@ class _MoneyManagerScreenState extends State<MoneyManagerScreen> {
       builder: (ctx) {
         return StatefulBuilder(
           builder: (context, setModalState) {
-            List<String> currentCategories = [];
-            if (type == 'Expense') {
-              currentCategories = _expenseCategories;
-            } else if (type == 'Income') {
-              currentCategories = _incomeCategories;
-            } else {
-              currentCategories = _accounts;
-            }
+            List<String> currentCategories = type == 'Expense'
+                ? _expenseCategories
+                : (type == 'Income' ? _incomeCategories : _accounts);
 
             return Padding(
               padding: EdgeInsets.only(
@@ -685,6 +753,7 @@ class _MoneyManagerScreenState extends State<MoneyManagerScreen> {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
+                    // Type Selector
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: ['Income', 'Expense', 'Transfer'].map((t) {
@@ -712,6 +781,8 @@ class _MoneyManagerScreenState extends State<MoneyManagerScreen> {
                       }).toList(),
                     ),
                     const SizedBox(height: 15),
+
+                    // Amount Field
                     TextField(
                       keyboardType: TextInputType.number,
                       style: const TextStyle(color: Colors.white),
@@ -723,17 +794,66 @@ class _MoneyManagerScreenState extends State<MoneyManagerScreen> {
                       onChanged: (val) => amount = double.tryParse(val) ?? 0,
                     ),
                     const SizedBox(height: 15),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          type == 'Transfer'
-                              ? "অ্যাকাউন্ট বাছাই করুন:"
-                              : "ক্যাটাগরি নির্ধারণ করুন:",
-                          style: const TextStyle(
-                              color: Colors.white, fontWeight: FontWeight.bold),
+
+                    // Account Selection (Income এবং Expense উভয়ের জন্যই দেখাবে)
+                    DropdownButtonFormField<String>(
+                      value: selectedAccount,
+                      dropdownColor: AppTheme.cardColor,
+                      style: const TextStyle(color: Colors.white),
+                      decoration: InputDecoration(
+                        labelText: type == 'Transfer'
+                            ? 'কোথা থেকে (From Account)'
+                            : 'অ্যাকাউন্ট (Account)',
+                        labelStyle: const TextStyle(color: Colors.grey),
+                        border: const OutlineInputBorder(),
+                      ),
+                      items: _accounts.map((acc) {
+                        return DropdownMenuItem<String>(
+                          value: acc,
+                          child: Text(acc),
+                        );
+                      }).toList(),
+                      onChanged: (val) {
+                        if (val != null) {
+                          setModalState(() => selectedAccount = val);
+                        }
+                      },
+                    ),
+                    const SizedBox(height: 15),
+
+                    // Category Selection Header / Transfer Target
+                    if (type == 'Transfer') ...[
+                      DropdownButtonFormField<String>(
+                        value: targetAccount,
+                        dropdownColor: AppTheme.cardColor,
+                        style: const TextStyle(color: Colors.white),
+                        decoration: const InputDecoration(
+                          labelText: 'কোথায় (To Account)',
+                          labelStyle: TextStyle(color: Colors.grey),
+                          border: OutlineInputBorder(),
                         ),
-                        if (type != 'Transfer')
+                        items: _accounts.map((acc) {
+                          return DropdownMenuItem<String>(
+                            value: acc,
+                            child: Text(acc),
+                          );
+                        }).toList(),
+                        onChanged: (val) {
+                          if (val != null) {
+                            setModalState(() => targetAccount = val);
+                          }
+                        },
+                      ),
+                      const SizedBox(height: 15),
+                    ] else ...[
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text(
+                            "ক্যাটাগরি নির্ধারণ করুন:",
+                            style: TextStyle(
+                                color: Colors.white, fontWeight: FontWeight.bold),
+                          ),
                           TextButton.icon(
                             icon: const Icon(Icons.add,
                                 size: 16, color: AppTheme.gold),
@@ -746,45 +866,51 @@ class _MoneyManagerScreenState extends State<MoneyManagerScreen> {
                               });
                             },
                           )
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    GridView.builder(
-                      shrinkWrap: true,
-                      physics: const NeverScrollableScrollPhysics(),
-                      gridDelegate:
-                          const SliverGridDelegateWithFixedCrossAxisCount(
-                        crossAxisCount: 3,
-                        childAspectRatio: 2.3,
-                        crossAxisSpacing: 8,
-                        mainAxisSpacing: 8,
+                        ],
                       ),
-                      itemCount: currentCategories.length,
-                      itemBuilder: (c, i) {
-                        String cat = currentCategories[i];
-                        bool isSelected = selectedCategory == cat;
-                        return GestureDetector(
-                          onTap: () => setModalState(() => selectedCategory = cat),
-                          child: Container(
-                            alignment: Alignment.center,
-                            padding: const EdgeInsets.symmetric(horizontal: 4),
-                            decoration: BoxDecoration(
-                              color: isSelected
-                                  ? Colors.redAccent
-                                  : AppTheme.cardLight,
-                              borderRadius: BorderRadius.circular(8),
+                      const SizedBox(height: 8),
+
+                      // Category Grid
+                      GridView.builder(
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        gridDelegate:
+                            const SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: 3,
+                          childAspectRatio: 2.3,
+                          crossAxisSpacing: 8,
+                          mainAxisSpacing: 8,
+                        ),
+                        itemCount: currentCategories.length,
+                        itemBuilder: (c, i) {
+                          String cat = currentCategories[i];
+                          bool isSelected = selectedCategory == cat;
+                          return GestureDetector(
+                            onTap: () =>
+                                setModalState(() => selectedCategory = cat),
+                            child: Container(
+                              alignment: Alignment.center,
+                              padding: const EdgeInsets.symmetric(horizontal: 4),
+                              decoration: BoxDecoration(
+                                color: isSelected
+                                    ? Colors.redAccent
+                                    : AppTheme.cardLight,
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Text(
+                                cat,
+                                style: const TextStyle(
+                                    color: Colors.white, fontSize: 11.5),
+                                textAlign: TextAlign.center,
+                              ),
                             ),
-                            child: Text(
-                              cat,
-                              style: const TextStyle(
-                                  color: Colors.white, fontSize: 11.5),
-                              textAlign: TextAlign.center,
-                            ),
-                          ),
-                        );
-                      },
-                    ),
-                    const SizedBox(height: 15),
+                          );
+                        },
+                      ),
+                      const SizedBox(height: 15),
+                    ],
+
+                    // Note Field
                     TextField(
                       style: const TextStyle(color: Colors.white),
                       decoration: const InputDecoration(
@@ -795,6 +921,8 @@ class _MoneyManagerScreenState extends State<MoneyManagerScreen> {
                       onChanged: (val) => note = val,
                     ),
                     const SizedBox(height: 20),
+
+                    // Save Button
                     ElevatedButton(
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.redAccent,
@@ -809,10 +937,10 @@ class _MoneyManagerScreenState extends State<MoneyManagerScreen> {
                           type: type,
                           amount: amount,
                           date: DateFormat('dd/MM/yyyy').format(DateTime.now()),
-                          category: selectedCategory,
+                          category: type == 'Transfer' ? 'Transfer' : selectedCategory,
                           account: type == 'Transfer'
-                              ? 'Transfer ($selectedCategory)'
-                              : 'Cash',
+                              ? '$selectedAccount ➔ $targetAccount'
+                              : selectedAccount, // নির্বাচিত অ্যাকাউন্টের সাথে লিংক হবে
                           note: note,
                         );
 
