@@ -77,17 +77,39 @@ class HomeScreen extends StatelessWidget {
       ),
     ];
 
+    final theme = Theme.of(context);
+
     return Scaffold(
-      backgroundColor: AppTheme.background,
+      backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
         title: const Text('সহজ হিসাব গোল্ড'),
+        actions: [
+          // ─── থিম চেঞ্জ বাটন (কর্নরে) ───
+          ValueListenableBuilder<ThemeMode>(
+            valueListenable: AppTheme.themeNotifier,
+            builder: (_, ThemeMode mode, __) {
+              final isDark = mode == ThemeMode.dark;
+              return IconButton(
+                icon: Icon(
+                  isDark ? Icons.light_mode_rounded : Icons.dark_mode_rounded,
+                  color: isDark ? AppTheme.gold : AppTheme.darkGreen,
+                ),
+                tooltip: 'থিম পরিবর্তন করুন',
+                onPressed: () {
+                  AppTheme.themeNotifier.value =
+                      isDark ? ThemeMode.light : ThemeMode.dark;
+                },
+              );
+            },
+          ),
+          const SizedBox(width: 8),
+        ],
       ),
       body: Stack(
         children: [
           const Positioned.fill(
             child: _IslamicBackground(),
           ),
-
           SafeArea(
             child: SingleChildScrollView(
               physics: const BouncingScrollPhysics(),
@@ -95,9 +117,7 @@ class HomeScreen extends StatelessWidget {
               child: Column(
                 children: [
                   const _HeaderCard(),
-
                   const SizedBox(height: 24),
-
                   Row(
                     children: [
                       Container(
@@ -115,19 +135,17 @@ class HomeScreen extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(width: 10),
-                      const Text(
+                      Text(
                         'হিসাব ও প্রয়োজনীয় টুল',
                         style: TextStyle(
-                          color: AppTheme.textDark,
+                          color: theme.textTheme.titleLarge?.color,
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
                     ],
                   ),
-
                   const SizedBox(height: 14),
-
                   GridView.builder(
                     shrinkWrap: true,
                     physics: const NeverScrollableScrollPhysics(),
@@ -155,9 +173,7 @@ class HomeScreen extends StatelessWidget {
                       );
                     },
                   ),
-
                   const SizedBox(height: 30),
-
                   const _BottomInfo(),
                 ],
               ),
@@ -195,7 +211,7 @@ class _HeaderCard extends StatelessWidget {
           end: Alignment.bottomRight,
           colors: [
             AppTheme.darkGreen,
-            AppTheme.backgroundSecondary,
+            AppTheme.backgroundSecondaryDark,
           ],
         ),
         borderRadius: BorderRadius.circular(28),
@@ -218,7 +234,7 @@ class _HeaderCard extends StatelessWidget {
             height: 58,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              color: AppTheme.background.withValues(alpha: 0.55),
+              color: AppTheme.backgroundDark.withValues(alpha: 0.55),
               border: Border.all(
                 color: AppTheme.gold.withValues(alpha: 0.65),
                 width: 1,
@@ -236,9 +252,7 @@ class _HeaderCard extends StatelessWidget {
               size: 29,
             ),
           ),
-
           const SizedBox(height: 14),
-
           const Text(
             'بِسْمِ اللهِ الرَّحْمٰنِ الرَّحِيْمِ',
             textAlign: TextAlign.center,
@@ -249,9 +263,7 @@ class _HeaderCard extends StatelessWidget {
               letterSpacing: 0.5,
             ),
           ),
-
           const SizedBox(height: 11),
-
           const Text(
             'সহজ হিসাব গোল্ড',
             textAlign: TextAlign.center,
@@ -262,9 +274,7 @@ class _HeaderCard extends StatelessWidget {
               letterSpacing: 0.2,
             ),
           ),
-
           const SizedBox(height: 7),
-
           Text(
             'সহজে হিসাব করুন',
             style: TextStyle(
@@ -273,9 +283,7 @@ class _HeaderCard extends StatelessWidget {
               fontWeight: FontWeight.w600,
             ),
           ),
-
           const SizedBox(height: 10),
-
           Container(
             height: 1,
             width: 100,
@@ -289,9 +297,7 @@ class _HeaderCard extends StatelessWidget {
               ),
             ),
           ),
-
           const SizedBox(height: 10),
-
           Text(
             'হিসাব, নোট, ক্যালেন্ডার ও প্রয়োজনীয় টুল এক জায়গায়',
             textAlign: TextAlign.center,
@@ -318,6 +324,9 @@ class _MenuCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
     return Material(
       color: Colors.transparent,
       borderRadius: BorderRadius.circular(21),
@@ -328,22 +337,31 @@ class _MenuCard extends StatelessWidget {
         highlightColor: AppTheme.gold.withValues(alpha: 0.08),
         child: Ink(
           decoration: BoxDecoration(
-            gradient: const LinearGradient(
+            gradient: LinearGradient(
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
-              colors: [
-                AppTheme.cardLight,
-                AppTheme.cardColor,
-              ],
+              colors: isDark
+                  ? const [
+                      AppTheme.cardLightDark,
+                      AppTheme.cardColorDark,
+                    ]
+                  : [
+                      Colors.white,
+                      const Color(0xFFF9F9F9),
+                    ],
             ),
             borderRadius: BorderRadius.circular(21),
             border: Border.all(
-              color: AppTheme.gold.withValues(alpha: 0.38),
+              color: isDark
+                  ? AppTheme.gold.withValues(alpha: 0.38)
+                  : AppTheme.darkGreen.withValues(alpha: 0.2),
               width: 0.7,
             ),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withValues(alpha: 0.22),
+                color: isDark
+                    ? Colors.black.withValues(alpha: 0.22)
+                    : Colors.black.withValues(alpha: 0.05),
                 blurRadius: 10,
                 offset: const Offset(0, 5),
               ),
@@ -387,16 +405,14 @@ class _MenuCard extends StatelessWidget {
                     size: 25,
                   ),
                 ),
-
                 const SizedBox(height: 10),
-
                 Text(
                   item.title,
                   textAlign: TextAlign.center,
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: AppTheme.textDark,
+                  style: TextStyle(
+                    color: theme.textTheme.bodyLarge?.color,
                     fontSize: 12.5,
                     fontWeight: FontWeight.bold,
                     height: 1.2,
@@ -416,6 +432,8 @@ class _BottomInfo extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
     return Column(
       children: [
         Row(
@@ -440,32 +458,26 @@ class _BottomInfo extends StatelessWidget {
             ),
           ],
         ),
-
         const SizedBox(height: 13),
-
-        const Text(
+        Text(
           'Developed by Talpatar Sepai',
           textAlign: TextAlign.center,
           style: TextStyle(
-            color: AppTheme.textDark,
+            color: theme.textTheme.bodyLarge?.color,
             fontSize: 13,
             fontWeight: FontWeight.w600,
           ),
         ),
-
         const SizedBox(height: 5),
-
-        const Text(
+        Text(
           'm.talpatarsepai@gmail.com',
           textAlign: TextAlign.center,
           style: TextStyle(
-            color: AppTheme.textMuted,
+            color: theme.textTheme.bodyMedium?.color,
             fontSize: 12,
           ),
         ),
-
         const SizedBox(height: 8),
-
         Text(
           'সহজ • সুন্দর • প্রয়োজনীয়',
           style: TextStyle(
@@ -484,23 +496,33 @@ class _IslamicBackground extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return CustomPaint(
-      painter: _IslamicPatternPainter(),
+      painter: _IslamicPatternPainter(isDark: isDark),
       child: const SizedBox.expand(),
     );
   }
 }
 
 class _IslamicPatternPainter extends CustomPainter {
+  final bool isDark;
+
+  _IslamicPatternPainter({required this.isDark});
+
   @override
   void paint(Canvas canvas, Size size) {
     final goldPaint = Paint()
-      ..color = AppTheme.gold.withValues(alpha: 0.035)
+      ..color = isDark
+          ? AppTheme.gold.withValues(alpha: 0.035)
+          : AppTheme.gold.withValues(alpha: 0.12)
       ..style = PaintingStyle.stroke
       ..strokeWidth = 0.9;
 
     final greenPaint = Paint()
-      ..color = AppTheme.green.withValues(alpha: 0.05)
+      ..color = isDark
+          ? AppTheme.green.withValues(alpha: 0.05)
+          : AppTheme.green.withValues(alpha: 0.15)
       ..style = PaintingStyle.stroke
       ..strokeWidth = 0.9;
 
@@ -553,7 +575,7 @@ class _IslamicPatternPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) {
-    return false;
+  bool shouldRepaint(covariant _IslamicPatternPainter oldDelegate) {
+    return oldDelegate.isDark != isDark;
   }
 }
