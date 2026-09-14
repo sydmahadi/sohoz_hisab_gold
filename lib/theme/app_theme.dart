@@ -32,7 +32,7 @@ class AppTheme {
   static const Color danger = Color(0xFF9B3D35);
 
   // ─────────────────────────────────────────────
-  // Legacy Static Constants (Allows use inside `const` widgets)
+  // Compile-time Safe Constants (Fixes GitHub Build Errors)
   // ─────────────────────────────────────────────
   static const Color background = backgroundDark;
   static const Color backgroundSecondary = backgroundSecondaryDark;
