@@ -3,8 +3,6 @@ import 'package:flutter/material.dart';
 
 import '../theme/app_theme.dart';
 import 'money_manager_screen.dart';
-import 'entry_screen.dart';
-import 'info_screen.dart';
 import 'note_screen.dart';
 import 'calculator_screen.dart';
 import 'calendar_screen.dart';
@@ -193,9 +191,10 @@ class HomeScreen extends StatelessWidget {
                             mainAxisSpacing: 10,
                             childAspectRatio: 0.92,
                             children: [
-                              // 1
+                              // 1 — মানি ম্যানেজার
                               _MenuCard(
-                                icon: Icons.account_balance_wallet_rounded,
+                                icon:
+                                    Icons.account_balance_wallet_rounded,
                                 title: 'মানি ম্যানেজার',
                                 onTap: () {
                                   Navigator.push(
@@ -208,37 +207,7 @@ class HomeScreen extends StatelessWidget {
                                 },
                               ),
 
-                              // 2
-                              _MenuCard(
-                                icon: Icons.edit_note_rounded,
-                                title: 'এন্ট্রি করুন',
-                                onTap: () {
-                                  Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (_) =>
-                                          const EntryScreen(),
-                                    ),
-                                  );
-                                },
-                              ),
-
-                              // 3
-                              _MenuCard(
-                                icon: Icons.menu_book_rounded,
-                                title: 'তথ্য দেখুন',
-                                onTap: () {
-                                  Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (_) =>
-                                          const InfoScreen(),
-                                    ),
-                                  );
-                                },
-                              ),
-
-                              // 4
+                              // 2 — নোট
                               _MenuCard(
                                 icon: Icons.note_alt_rounded,
                                 title: 'নোট',
@@ -253,7 +222,7 @@ class HomeScreen extends StatelessWidget {
                                 },
                               ),
 
-                              // 5
+                              // 3 — ক্যালকুলেটর
                               _MenuCard(
                                 icon: Icons.calculate_rounded,
                                 title: 'ক্যালকুলেটর',
@@ -268,7 +237,7 @@ class HomeScreen extends StatelessWidget {
                                 },
                               ),
 
-                              // 6
+                              // 4 — ক্যালেন্ডার
                               _MenuCard(
                                 icon: Icons.calendar_month_rounded,
                                 title: 'ক্যালেন্ডার',
@@ -283,7 +252,7 @@ class HomeScreen extends StatelessWidget {
                                 },
                               ),
 
-                              // 7
+                              // 5 — তারিখ হিসাব
                               _MenuCard(
                                 icon: Icons.event_available_rounded,
                                 title: 'তারিখ হিসাব',
@@ -298,7 +267,7 @@ class HomeScreen extends StatelessWidget {
                                 },
                               ),
 
-                              // 8
+                              // 6 — সময় যোগ
                               _MenuCard(
                                 icon: Icons.access_time_filled_rounded,
                                 title: 'সময় যোগ',
@@ -313,7 +282,7 @@ class HomeScreen extends StatelessWidget {
                                 },
                               ),
 
-                              // 9
+                              // 7 — দৈনিক গড়
                               _MenuCard(
                                 icon: Icons.speed_rounded,
                                 title: 'দৈনিক গড়',
@@ -328,7 +297,7 @@ class HomeScreen extends StatelessWidget {
                                 },
                               ),
 
-                              // 10
+                              // 8 — মাসিক গড়
                               _MenuCard(
                                 icon: Icons.date_range_rounded,
                                 title: 'মাসিক গড়',
@@ -343,7 +312,7 @@ class HomeScreen extends StatelessWidget {
                                 },
                               ),
 
-                              // 11
+                              // 9 — ব্রাউজার
                               _MenuCard(
                                 icon: Icons.language_rounded,
                                 title: 'ব্রাউজার',
@@ -358,7 +327,7 @@ class HomeScreen extends StatelessWidget {
                                 },
                               ),
 
-                              // 12
+                              // 10 — অ্যাপ সম্পর্কে
                               _MenuCard(
                                 icon: Icons.info_outline_rounded,
                                 title: 'অ্যাপ সম্পর্কে',
