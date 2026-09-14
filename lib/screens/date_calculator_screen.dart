@@ -41,13 +41,18 @@ class _DateCalculatorScreenState extends State<DateCalculatorScreen> {
       firstDate: DateTime(1900),
       lastDate: DateTime(2100),
       builder: (context, child) {
+        final theme = Theme.of(context);
+
         return Theme(
-          data: Theme.of(context).copyWith(
-            colorScheme: const ColorScheme.dark(
+          data: theme.copyWith(
+            colorScheme: theme.colorScheme.copyWith(
               primary: AppTheme.gold,
               onPrimary: Colors.black,
               surface: AppTheme.cardColor,
-              onSurface: AppTheme.textDark,
+              onSurface: AppTheme.textPrimary,
+            ),
+            dialogTheme: DialogThemeData(
+              backgroundColor: AppTheme.cardColor,
             ),
           ),
           child: child!,
@@ -64,12 +69,15 @@ class _DateCalculatorScreenState extends State<DateCalculatorScreen> {
   }
 
   void _calculateDate() {
-    final int? days = int.tryParse(_daysController.text.trim());
+    final int? days = int.tryParse(
+      _daysController.text.trim(),
+    );
 
     if (days == null || days < 0) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('সঠিক সংখ্যক দিন লিখুন'),
+          behavior: SnackBarBehavior.floating,
         ),
       );
       return;
@@ -92,14 +100,20 @@ class _DateCalculatorScreenState extends State<DateCalculatorScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppTheme.background,
+
       appBar: AppBar(
         title: const Text('তারিখ হিসাব'),
       ),
+
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(18),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            // =========================
+            // INFORMATION CARD
+            // =========================
+
             Card(
               child: Padding(
                 padding: const EdgeInsets.all(20),
@@ -110,18 +124,22 @@ class _DateCalculatorScreenState extends State<DateCalculatorScreen> {
                       color: AppTheme.gold,
                       size: 48,
                     ),
+
                     const SizedBox(height: 12),
-                    const Text(
+
+                    Text(
                       'তারিখ থেকে দিন বাদ দিন',
                       style: TextStyle(
-                        color: AppTheme.textDark,
+                        color: AppTheme.textPrimary,
                         fontSize: 20,
                         fontWeight: FontWeight.bold,
                       ),
                       textAlign: TextAlign.center,
                     ),
+
                     const SizedBox(height: 8),
-                    const Text(
+
+                    Text(
                       'একটি তারিখ নির্বাচন করে কত দিন বাদ দিতে চান তা লিখুন।',
                       style: TextStyle(
                         color: AppTheme.textMuted,
@@ -135,6 +153,10 @@ class _DateCalculatorScreenState extends State<DateCalculatorScreen> {
             ),
 
             const SizedBox(height: 18),
+
+            // =========================
+            // INPUT CARD
+            // =========================
 
             Card(
               child: Padding(
@@ -150,6 +172,7 @@ class _DateCalculatorScreenState extends State<DateCalculatorScreen> {
                         fontWeight: FontWeight.bold,
                       ),
                     ),
+
                     const SizedBox(height: 10),
 
                     InkWell(
@@ -164,7 +187,7 @@ class _DateCalculatorScreenState extends State<DateCalculatorScreen> {
                           color: AppTheme.cardLight,
                           borderRadius: BorderRadius.circular(17),
                           border: Border.all(
-                            color: AppTheme.gold.withOpacity(0.5),
+                            color: AppTheme.gold.withValues(alpha: 0.5),
                           ),
                         ),
                         child: Row(
@@ -173,17 +196,22 @@ class _DateCalculatorScreenState extends State<DateCalculatorScreen> {
                               Icons.event_rounded,
                               color: AppTheme.gold,
                             ),
+
                             const SizedBox(width: 12),
+
                             Expanded(
                               child: Text(
-                                _formatBanglaDate(_selectedDate),
-                                style: const TextStyle(
-                                  color: AppTheme.textDark,
+                                _formatBanglaDate(
+                                  _selectedDate,
+                                ),
+                                style: TextStyle(
+                                  color: AppTheme.textPrimary,
                                   fontSize: 16,
                                   fontWeight: FontWeight.w600,
                                 ),
                               ),
                             ),
+
                             const Icon(
                               Icons.arrow_drop_down_rounded,
                               color: AppTheme.gold,
@@ -211,13 +239,19 @@ class _DateCalculatorScreenState extends State<DateCalculatorScreen> {
 
                     ElevatedButton.icon(
                       onPressed: _calculateDate,
-                      icon: const Icon(Icons.calculate_rounded),
+                      icon: const Icon(
+                        Icons.calculate_rounded,
+                      ),
                       label: const Text('হিসাব করুন'),
                     ),
                   ],
                 ),
               ),
             ),
+
+            // =========================
+            // RESULT
+            // =========================
 
             if (_resultDate != null) ...[
               const SizedBox(height: 18),
@@ -232,15 +266,19 @@ class _DateCalculatorScreenState extends State<DateCalculatorScreen> {
                         color: AppTheme.gold,
                         size: 46,
                       ),
+
                       const SizedBox(height: 12),
-                      const Text(
+
+                      Text(
                         'হিসাবের ফলাফল',
                         style: TextStyle(
                           color: AppTheme.textMuted,
                           fontSize: 15,
                         ),
                       ),
+
                       const SizedBox(height: 8),
+
                       Text(
                         _formatBanglaDate(_resultDate!),
                         textAlign: TextAlign.center,
