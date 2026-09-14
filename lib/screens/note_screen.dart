@@ -1,8 +1,5 @@
-import 'dart:convert';
-
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-
 import '../theme/app_theme.dart';
 
 class NoteScreen extends StatefulWidget {
@@ -16,8 +13,7 @@ class _NoteScreenState extends State<NoteScreen> {
   static const String _notesKey = 'sohoz_hisab_plus_notes';
   static const String _oldNoteKey = 'sohoz_hisab_plus_note';
 
-  List<Map<String, dynamic>> _notes = [];
-  bool _isLoading = true;
+  List<Map<String, String>> _notes = [];
 
   @override
   void initState() {
@@ -25,245 +21,101 @@ class _NoteScreenState extends State<NoteScreen> {
     _loadNotes();
   }
 
-  // =========================
+  // ============================================================
   // LOAD NOTES
-  // =========================
+  // ============================================================
 
   Future<void> _loadNotes() async {
     final prefs = await SharedPreferences.getInstance();
 
-    final savedNotes = prefs.getString(_notesKey);
-
-    List<Map<String, dynamic>> loadedNotes = [];
+    final savedNotes = prefs.getStringList(_notesKey);
 
     if (savedNotes != null && savedNotes.isNotEmpty) {
-      try {
-        final decoded = jsonDecode(savedNotes);
+      final loaded = <Map<String, String>>[];
 
-        if (decoded is List) {
-          loadedNotes = decoded
-              .map(
-                (item) => Map<String, dynamic>.from(item as Map),
-              )
-              .toList();
+      for (final item in savedNotes) {
+        final separatorIndex = item.indexOf('|||');
+
+        if (separatorIndex >= 0) {
+          loaded.add({
+            'title': item.substring(0, separatorIndex),
+            'content': item.substring(separatorIndex + 3),
+          });
         }
-      } catch (_) {
-        loadedNotes = [];
       }
-    }
 
-    // পুরোনো single note থাকলে নতুন notes system-এ নিয়ে আসবে
-    if (loadedNotes.isEmpty) {
-      final oldNote = prefs.getString(_oldNoteKey) ?? '';
-
-      if (oldNote.trim().isNotEmpty) {
-        loadedNotes.add({
-          'id': DateTime.now().millisecondsSinceEpoch.toString(),
-          'title': 'পুরোনো নোট',
-          'content': oldNote,
-          'createdAt': DateTime.now().toIso8601String(),
+      if (mounted) {
+        setState(() {
+          _notes = loaded;
         });
-
-        await prefs.setString(
-          _notesKey,
-          jsonEncode(loadedNotes),
-        );
-
-        await prefs.remove(_oldNoteKey);
       }
+
+      return;
     }
 
-    if (!mounted) return;
+    // পুরোনো single-note data থাকলে সেটি migrate করা
+    final oldNote = prefs.getString(_oldNoteKey);
 
-    setState(() {
-      _notes = loadedNotes;
-      _isLoading = false;
-    });
+    if (oldNote != null && oldNote.trim().isNotEmpty) {
+      _notes = [
+        {
+          'title': 'নোট',
+          'content': oldNote,
+        }
+      ];
+
+      await _saveNotes();
+
+      await prefs.remove(_oldNoteKey);
+
+      if (mounted) {
+        setState(() {});
+      }
+    }
   }
 
-  // =========================
+  // ============================================================
   // SAVE NOTES
-  // =========================
+  // ============================================================
 
   Future<void> _saveNotes() async {
     final prefs = await SharedPreferences.getInstance();
 
-    await prefs.setString(
-      _notesKey,
-      jsonEncode(_notes),
-    );
+    final data = _notes.map((note) {
+      final title = note['title'] ?? '';
+      final content = note['content'] ?? '';
+
+      return '$title|||$content';
+    }).toList();
+
+    await prefs.setStringList(_notesKey, data);
   }
 
-  // =========================
-  // ADD NOTE
-  // =========================
+  // ============================================================
+  // ADD / EDIT NOTE
+  // ============================================================
 
-  Future<void> _addNote() async {
-    final result = await _showNoteDialog();
-
-    if (result == null) return;
-
-    final title = result['title']!.trim();
-    final content = result['content']!.trim();
-
-    if (title.isEmpty && content.isEmpty) {
-      return;
-    }
-
-    final newNote = {
-      'id': DateTime.now().millisecondsSinceEpoch.toString(),
-      'title': title.isEmpty ? 'নোট' : title,
-      'content': content,
-      'createdAt': DateTime.now().toIso8601String(),
-    };
-
-    setState(() {
-      _notes.insert(0, newNote);
-    });
-
-    await _saveNotes();
-
-    if (!mounted) return;
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('নোট সংরক্ষণ করা হয়েছে'),
-        behavior: SnackBarBehavior.floating,
-      ),
-    );
-  }
-
-  // =========================
-  // EDIT NOTE
-  // =========================
-
-  Future<void> _editNote(int index) async {
-    final note = _notes[index];
-
-    final result = await _showNoteDialog(
-      title: note['title']?.toString() ?? '',
-      content: note['content']?.toString() ?? '',
-      isEditing: true,
-    );
-
-    if (result == null) return;
-
-    final title = result['title']!.trim();
-    final content = result['content']!.trim();
-
-    if (title.isEmpty && content.isEmpty) {
-      return;
-    }
-
-    setState(() {
-      _notes[index] = {
-        ..._notes[index],
-        'title': title.isEmpty ? 'নোট' : title,
-        'content': content,
-      };
-    });
-
-    await _saveNotes();
-
-    if (!mounted) return;
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('নোট আপডেট করা হয়েছে'),
-        behavior: SnackBarBehavior.floating,
-      ),
-    );
-  }
-
-  // =========================
-  // DELETE NOTE
-  // =========================
-
-  Future<void> _deleteNote(int index) async {
-    final note = _notes[index];
-
-    final shouldDelete = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) {
-        return AlertDialog(
-          backgroundColor: AppTheme.cardColor,
-          title: Text(
-            'নোট মুছবেন?',
-            style: TextStyle(
-              color: AppTheme.textPrimary,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          content: Text(
-            '“${note['title']}” নোটটি মুছে ফেলা হবে।',
-            style: TextStyle(
-              color: AppTheme.textMuted,
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.pop(dialogContext, false);
-              },
-              child: const Text('বাতিল'),
-            ),
-            TextButton(
-              onPressed: () {
-                Navigator.pop(dialogContext, true);
-              },
-              child: const Text(
-                'মুছুন',
-                style: TextStyle(
-                  color: AppTheme.gold,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ),
-          ],
-        );
-      },
-    );
-
-    if (shouldDelete != true) return;
-
-    setState(() {
-      _notes.removeAt(index);
-    });
-
-    await _saveNotes();
-
-    if (!mounted) return;
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('নোট মুছে ফেলা হয়েছে'),
-        behavior: SnackBarBehavior.floating,
-      ),
-    );
-  }
-
-  // =========================
-  // NOTE DIALOG
-  // =========================
-
-  Future<Map<String, String>?> _showNoteDialog({
-    String title = '',
-    String content = '',
-    bool isEditing = false,
-  }) async {
-    final titleController = TextEditingController(text: title);
-    final contentController = TextEditingController(text: content);
+  Future<void> _addOrEditNote({int? index}) async {
+    final existingNote =
+        index != null && index >= 0 && index < _notes.length
+            ? _notes[index]
+            : null;
 
     final result = await showDialog<Map<String, String>>(
       context: context,
       builder: (dialogContext) {
+        final titleController = TextEditingController(
+          text: existingNote?['title'] ?? '',
+        );
+
+        final contentController = TextEditingController(
+          text: existingNote?['content'] ?? '',
+        );
+
         return AlertDialog(
           backgroundColor: AppTheme.cardColor,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(22),
-          ),
           title: Text(
-            isEditing ? 'নোট সম্পাদনা' : 'নতুন নোট',
+            index == null ? 'নতুন নোট' : 'নোট সম্পাদনা',
             style: TextStyle(
               color: AppTheme.textPrimary,
               fontWeight: FontWeight.bold,
@@ -280,19 +132,359 @@ class _NoteScreenState extends State<NoteScreen> {
                     style: TextStyle(
                       color: AppTheme.textPrimary,
                     ),
-                    textInputAction: TextInputAction.next,
                     decoration: InputDecoration(
                       labelText: 'নোটের শিরোনাম',
-                      hintText: 'যেমন: আজকের কাজ',
                       labelStyle: TextStyle(
                         color: AppTheme.textMuted,
                       ),
-                      hintStyle: TextStyle(
+                      filled: true,
+                      fillColor: AppTheme.cardLight,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  TextField(
+                    controller: contentController,
+                    minLines: 5,
+                    maxLines: 10,
+                    style: TextStyle(
+                      color: AppTheme.textPrimary,
+                    ),
+                    decoration: InputDecoration(
+                      labelText: 'নোট লিখুন',
+                      alignLabelWithHint: true,
+                      labelStyle: TextStyle(
                         color: AppTheme.textMuted,
                       ),
-                      prefixIcon: Icon(
-                        Icons.title_rounded,
-                        color: AppTheme.gold,
-                      ),
                       filled: true,
-                      fillColor: AppTheme.cardLight
+                      fillColor: AppTheme.cardLight,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.pop(dialogContext);
+              },
+              child: Text(
+                'বাতিল',
+                style: TextStyle(
+                  color: AppTheme.textMuted,
+                ),
+              ),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor:
+                    AppTheme.isDark
+                        ? AppTheme.gold
+                        : AppTheme.darkGreen,
+                foregroundColor:
+                    AppTheme.isDark
+                        ? AppTheme.primaryDark
+                        : Colors.white,
+              ),
+              onPressed: () {
+                final title = titleController.text.trim();
+                final content = contentController.text.trim();
+
+                if (title.isEmpty && content.isEmpty) {
+                  return;
+                }
+
+                Navigator.pop(
+                  dialogContext,
+                  {
+                    'title': title.isEmpty ? 'নোট' : title,
+                    'content': content,
+                  },
+                );
+              },
+              child: const Text('সংরক্ষণ'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (result == null) {
+      return;
+    }
+
+    if (!mounted) {
+      return;
+    }
+
+    setState(() {
+      if (index == null) {
+        _notes.insert(0, result);
+      } else {
+        _notes[index] = result;
+      }
+    });
+
+    await _saveNotes();
+  }
+
+  // ============================================================
+  // DELETE NOTE
+  // ============================================================
+
+  Future<void> _deleteNote(int index) async {
+    if (index < 0 || index >= _notes.length) {
+      return;
+    }
+
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          backgroundColor: AppTheme.cardColor,
+          title: Text(
+            'নোট মুছে ফেলবেন?',
+            style: TextStyle(
+              color: AppTheme.textPrimary,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          content: Text(
+            'এই নোটটি স্থায়ীভাবে মুছে যাবে।',
+            style: TextStyle(
+              color: AppTheme.textMuted,
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.pop(dialogContext, false);
+              },
+              child: Text(
+                'না',
+                style: TextStyle(
+                  color: AppTheme.textMuted,
+                ),
+              ),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppTheme.danger,
+                foregroundColor: Colors.white,
+              ),
+              onPressed: () {
+                Navigator.pop(dialogContext, true);
+              },
+              child: const Text('মুছে ফেলুন'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirm != true || !mounted) {
+      return;
+    }
+
+    setState(() {
+      _notes.removeAt(index);
+    });
+
+    await _saveNotes();
+  }
+
+  // ============================================================
+  // NOTE CARD
+  // ============================================================
+
+  Widget _buildNoteCard(
+    BuildContext context,
+    Map<String, String> note,
+    int index,
+  ) {
+    final title = note['title'] ?? 'নোট';
+    final content = note['content'] ?? '';
+
+    return Card(
+      color: AppTheme.cardColor,
+      elevation: 2,
+      margin: const EdgeInsets.only(bottom: 12),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: Text(
+                    title,
+                    style: TextStyle(
+                      color: AppTheme.textPrimary,
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+                PopupMenuButton<String>(
+                  icon: Icon(
+                    Icons.more_vert,
+                    color: AppTheme.textMuted,
+                  ),
+                  color: AppTheme.cardColor,
+                  onSelected: (value) {
+                    if (value == 'edit') {
+                      _addOrEditNote(index: index);
+                    } else if (value == 'delete') {
+                      _deleteNote(index);
+                    }
+                  },
+                  itemBuilder: (context) => [
+                    PopupMenuItem<String>(
+                      value: 'edit',
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.edit_outlined,
+                            color: AppTheme.gold,
+                          ),
+                          const SizedBox(width: 10),
+                          Text(
+                            'সম্পাদনা',
+                            style: TextStyle(
+                              color: AppTheme.textPrimary,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    PopupMenuItem<String>(
+                      value: 'delete',
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.delete_outline,
+                            color: AppTheme.danger,
+                          ),
+                          const SizedBox(width: 10),
+                          Text(
+                            'মুছে ফেলুন',
+                            style: TextStyle(
+                              color: AppTheme.textPrimary,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text(
+              content,
+              style: TextStyle(
+                color: AppTheme.textMuted,
+                fontSize: 15,
+                height: 1.5,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ============================================================
+  // BUILD
+  // ============================================================
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: AppTheme.background,
+      appBar: AppBar(
+        backgroundColor: AppTheme.backgroundSecondary,
+        elevation: 0,
+        title: Text(
+          'নোট',
+          style: TextStyle(
+            color: AppTheme.textPrimary,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        iconTheme: IconThemeData(
+          color: AppTheme.textPrimary,
+        ),
+      ),
+      floatingActionButton: FloatingActionButton(
+        backgroundColor:
+            AppTheme.isDark
+                ? AppTheme.gold
+                : AppTheme.darkGreen,
+        foregroundColor:
+            AppTheme.isDark
+                ? AppTheme.primaryDark
+                : Colors.white,
+        onPressed: () => _addOrEditNote(),
+        child: const Icon(Icons.add),
+      ),
+      body: _notes.isEmpty
+          ? Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.note_alt_outlined,
+                    size: 70,
+                    color: AppTheme.textMuted,
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    'এখনো কোনো নোট নেই',
+                    style: TextStyle(
+                      color: AppTheme.textPrimary,
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'নিচের + বাটনে চাপ দিয়ে নতুন নোট যোগ করুন',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: AppTheme.textMuted,
+                    ),
+                  ),
+                ],
+              ),
+            )
+          : ListView.builder(
+              padding: const EdgeInsets.fromLTRB(
+                16,
+                16,
+                16,
+                90,
+              ),
+              itemCount: _notes.length,
+              itemBuilder: (context, index) {
+                return _buildNoteCard(
+                  context,
+                  _notes[index],
+                  index,
+                );
+              },
+            ),
+    );
+  }
+}
