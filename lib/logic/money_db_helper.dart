@@ -1,5 +1,6 @@
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class MoneyTransaction {
   final int? id;
@@ -55,6 +56,20 @@ class MoneyDbHelper {
   MoneyDbHelper._init();
 
   // ============================================================
+  // DEFAULT ACCOUNTS
+  // ============================================================
+
+  static const List<String> defaultAccounts = [
+    'Cash',
+    'Bkash',
+    'Bank Account',
+    'Nagad',
+    'Card',
+  ];
+
+  static const String _accountsKey = 'money_manager_accounts';
+
+  // ============================================================
   // DATABASE
   // ============================================================
 
@@ -71,7 +86,10 @@ class MoneyDbHelper {
   Future<Database> _initDB(String fileName) async {
     final dbPath = await getDatabasesPath();
 
-    final dbFilePath = join(dbPath, fileName);
+    final dbFilePath = join(
+      dbPath,
+      fileName,
+    );
 
     return await openDatabase(
       dbFilePath,
@@ -102,6 +120,73 @@ class MoneyDbHelper {
   }
 
   // ============================================================
+  // ACCOUNTS
+  // ============================================================
+
+  Future<List<String>> getAccounts() async {
+    final prefs = await SharedPreferences.getInstance();
+
+    final savedAccounts = prefs.getStringList(
+      _accountsKey,
+    );
+
+    if (savedAccounts == null || savedAccounts.isEmpty) {
+      await prefs.setStringList(
+        _accountsKey,
+        defaultAccounts,
+      );
+
+      return List<String>.from(defaultAccounts);
+    }
+
+    return List<String>.from(savedAccounts);
+  }
+
+  Future<bool> addAccount(String account) async {
+    final name = account.trim();
+
+    if (name.isEmpty) {
+      return false;
+    }
+
+    final accounts = await getAccounts();
+
+    final exists = accounts.any(
+      (item) => item.toLowerCase() == name.toLowerCase(),
+    );
+
+    if (exists) {
+      return false;
+    }
+
+    accounts.add(name);
+
+    final prefs = await SharedPreferences.getInstance();
+
+    return await prefs.setStringList(
+      _accountsKey,
+      accounts,
+    );
+  }
+
+  Future<bool> deleteAccount(String account) async {
+    if (defaultAccounts.contains(account)) {
+      return false;
+    }
+
+    final accounts = await getAccounts();
+
+    accounts.remove(account);
+
+    final prefs = await SharedPreferences.getInstance();
+
+    return await prefs.setStringList(
+      _accountsKey,
+      accounts,
+    );
+  }
+
+  // ============================================================
   // INSERT TRANSACTION
   // ============================================================
 
@@ -112,7 +197,6 @@ class MoneyDbHelper {
 
     final data = transaction.toMap();
 
-    // ID database নিজে তৈরি করবে
     data.remove('id');
 
     return await db.insert(
@@ -248,7 +332,6 @@ class MoneyDbHelper {
 
     final data = transaction.toMap();
 
-    // ID update করার প্রয়োজন নেই
     data.remove('id');
 
     return await db.update(
@@ -363,6 +446,7 @@ class MoneyDbHelper {
   Future<void> close() async {
     if (_database != null) {
       await _database!.close();
+
       _database = null;
     }
   }
