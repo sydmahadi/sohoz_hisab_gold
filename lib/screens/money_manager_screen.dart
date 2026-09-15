@@ -15,11 +15,20 @@ class MoneyManagerScreen extends StatefulWidget {
       _MoneyManagerScreenState();
 }
 
-class _MoneyManagerScreenState
-    extends State<MoneyManagerScreen> {
+class _MoneyManagerScreenState extends State<MoneyManagerScreen> {
   int _currentIndex = 0;
   int _statsTab = 1;
   String _filterType = 'Monthly';
+
+  // ============================================================
+  // SELECTED MONTH
+  // ============================================================
+
+  DateTime _selectedMonth = DateTime(
+    DateTime.now().year,
+    DateTime.now().month,
+    1,
+  );
 
   List<MoneyTransaction> _transactions = [];
 
@@ -161,11 +170,22 @@ class _MoneyManagerScreenState
   // ============================================================
 
   DateTime? _parseDate(String value) {
-    try {
-      return DateFormat('dd/MM/yyyy').parseStrict(value);
-    } catch (_) {
-      return null;
+    final formats = [
+      'dd/MM/yyyy',
+      'dd-MM-yyyy',
+      'dd.MM.yyyy',
+      'yyyy/MM/dd',
+      'yyyy-MM-dd',
+      'yyyy.MM.dd',
+    ];
+
+    for (final format in formats) {
+      try {
+        return DateFormat(format).parseStrict(value);
+      } catch (_) {}
     }
+
+    return DateTime.tryParse(value);
   }
 
   // ============================================================
@@ -203,6 +223,49 @@ class _MoneyManagerScreenState
     ];
 
     return '${date.day} ${months[date.month - 1]} ${date.year}';
+  }
+
+  String _banglaMonthYear(DateTime date) {
+    const months = [
+      'জানুয়ারি',
+      'ফেব্রুয়ারি',
+      'মার্চ',
+      'এপ্রিল',
+      'মে',
+      'জুন',
+      'জুলাই',
+      'আগস্ট',
+      'সেপ্টেম্বর',
+      'অক্টোবর',
+      'নভেম্বর',
+      'ডিসেম্বর',
+    ];
+
+    return '${months[date.month - 1]} ${date.year}';
+  }
+
+  // ============================================================
+  // CHANGE MONTH
+  // ============================================================
+
+  void _previousMonth() {
+    setState(() {
+      _selectedMonth = DateTime(
+        _selectedMonth.year,
+        _selectedMonth.month - 1,
+        1,
+      );
+    });
+  }
+
+  void _nextMonth() {
+    setState(() {
+      _selectedMonth = DateTime(
+        _selectedMonth.year,
+        _selectedMonth.month + 1,
+        1,
+      );
+    });
   }
 
   // ============================================================
@@ -247,12 +310,12 @@ class _MoneyManagerScreenState
       }
 
       if (_filterType == 'Monthly') {
-        return transactionDate.year == today.year &&
-            transactionDate.month == today.month;
+        return transactionDate.year == _selectedMonth.year &&
+            transactionDate.month == _selectedMonth.month;
       }
 
       if (_filterType == 'Yearly') {
-        return transactionDate.year == today.year;
+        return transactionDate.year == _selectedMonth.year;
       }
 
       return false;
@@ -498,10 +561,7 @@ class _MoneyManagerScreenState
           ),
         ],
       ),
-
-      // IndexedStack পুরোপুরি বাদ।
       body: _buildCurrentPage(),
-
       floatingActionButton: _currentIndex == 0
           ? FloatingActionButton.extended(
               backgroundColor: AppTheme.gold,
@@ -518,7 +578,6 @@ class _MoneyManagerScreenState
               ),
             )
           : null,
-
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _currentIndex,
         onTap: (index) {
@@ -686,10 +745,10 @@ class _MoneyManagerScreenState
         return 'এই সপ্তাহে কোনো লেনদেন নেই';
 
       case 'Monthly':
-        return 'এই মাসে কোনো লেনদেন নেই';
+        return '${_banglaMonthYear(_selectedMonth)}-এ কোনো লেনদেন নেই';
 
       default:
-        return 'এই বছরে কোনো লেনদেন নেই';
+        return '${_selectedMonth.year} সালে কোনো লেনদেন নেই';
     }
   }
 
@@ -698,19 +757,77 @@ class _MoneyManagerScreenState
   // ============================================================
 
   Widget _buildFilterBar() {
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(
+            12,
+            10,
+            12,
+            5,
+          ),
+          child: Container(
+            padding: const EdgeInsets.all(5),
+            decoration: BoxDecoration(
+              color: AppTheme.cardColor,
+              borderRadius:
+                  BorderRadius.circular(15),
+              border: Border.all(
+                color: AppTheme.gold.withValues(
+                  alpha: 0.15,
+                ),
+              ),
+            ),
+            child: Row(
+              children: [
+                _filterButton(
+                  'Daily',
+                  'দৈনিক',
+                ),
+                _filterButton(
+                  'Weekly',
+                  'সাপ্তাহিক',
+                ),
+                _filterButton(
+                  'Monthly',
+                  'মাসিক',
+                ),
+                _filterButton(
+                  'Yearly',
+                  'বার্ষিক',
+                ),
+              ],
+            ),
+          ),
+        ),
+
+        if (_filterType == 'Monthly')
+          _buildMonthSelector(),
+      ],
+    );
+  }
+
+  // ============================================================
+  // MONTH SELECTOR
+  // ============================================================
+
+  Widget _buildMonthSelector() {
     return Padding(
       padding: const EdgeInsets.fromLTRB(
         12,
-        10,
+        3,
         12,
         5,
       ),
       child: Container(
-        padding: const EdgeInsets.all(5),
+        padding: const EdgeInsets.symmetric(
+          horizontal: 5,
+          vertical: 4,
+        ),
         decoration: BoxDecoration(
           color: AppTheme.cardColor,
           borderRadius:
-              BorderRadius.circular(15),
+              BorderRadius.circular(14),
           border: Border.all(
             color: AppTheme.gold.withValues(
               alpha: 0.15,
@@ -719,21 +836,45 @@ class _MoneyManagerScreenState
         ),
         child: Row(
           children: [
-            _filterButton(
-              'Daily',
-              'দৈনিক',
+            IconButton(
+              onPressed: _previousMonth,
+              tooltip: 'আগের মাস',
+              icon: Icon(
+                Icons.chevron_left_rounded,
+                color: AppTheme.gold,
+              ),
             ),
-            _filterButton(
-              'Weekly',
-              'সাপ্তাহিক',
+            Expanded(
+              child: Column(
+                children: [
+                  Text(
+                    'মাসিক হিসাব',
+                    style: TextStyle(
+                      color: AppTheme.textMuted,
+                      fontSize: 10,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    _banglaMonthYear(_selectedMonth),
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: AppTheme.goldLight,
+                      fontSize: 15,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ],
+              ),
             ),
-            _filterButton(
-              'Monthly',
-              'মাসিক',
-            ),
-            _filterButton(
-              'Yearly',
-              'বার্ষিক',
+            IconButton(
+              onPressed: _nextMonth,
+              tooltip: 'পরের মাস',
+              icon: Icon(
+                Icons.chevron_right_rounded,
+                color: AppTheme.gold,
+              ),
             ),
           ],
         ),
@@ -753,6 +894,14 @@ class _MoneyManagerScreenState
         onTap: () {
           setState(() {
             _filterType = value;
+
+            if (value == 'Monthly') {
+              _selectedMonth = DateTime(
+                _selectedMonth.year,
+                _selectedMonth.month,
+                1,
+              );
+            }
           });
         },
         child: AnimatedContainer(
@@ -1241,10 +1390,10 @@ class _MoneyManagerScreenState
         return 'সাপ্তাহিক হিসাব';
 
       case 'Monthly':
-        return 'মাসিক হিসাব';
+        return 'মাসিক হিসাব — ${_banglaMonthYear(_selectedMonth)}';
 
       default:
-        return 'বার্ষিক হিসাব';
+        return 'বার্ষিক হিসাব — ${_selectedMonth.year}';
     }
   }
 
@@ -2144,8 +2293,6 @@ class _TransactionSheetState
 
       if (!mounted) return;
 
-      // Save হওয়ার পর সরাসরি sheet close।
-      // Parent এখানে update হচ্ছে না।
       Navigator.of(context).pop(true);
     } catch (_) {
       if (!mounted) return;
@@ -2221,9 +2368,7 @@ class _TransactionSheetState
                   ),
                 ),
               ),
-
               const SizedBox(height: 15),
-
               Text(
                 'নতুন লেনদেন',
                 style: TextStyle(
@@ -2234,9 +2379,7 @@ class _TransactionSheetState
                       FontWeight.w900,
                 ),
               ),
-
               const SizedBox(height: 15),
-
               Row(
                 children: [
                   Expanded(
@@ -2270,13 +2413,9 @@ class _TransactionSheetState
                   ),
                 ],
               ),
-
               const SizedBox(height: 16),
-
               _label('পরিমাণ'),
-
               const SizedBox(height: 6),
-
               TextField(
                 controller:
                     _amountController,
@@ -2297,15 +2436,11 @@ class _TransactionSheetState
                   prefixText: '৳ ',
                 ),
               ),
-
               const SizedBox(height: 13),
-
               _label(
                 'লেনদেনের তারিখ',
               ),
-
               const SizedBox(height: 6),
-
               GestureDetector(
                 onTap: _saving
                     ? null
@@ -2368,17 +2503,13 @@ class _TransactionSheetState
                   ),
                 ),
               ),
-
               const SizedBox(height: 13),
-
               _label(
                 _type == 'Transfer'
                     ? 'যে অ্যাকাউন্ট থেকে'
                     : 'অ্যাকাউন্ট',
               ),
-
               const SizedBox(height: 6),
-
               DropdownButtonFormField<String>(
                 value: _selectedAccount,
                 isExpanded: true,
@@ -2401,14 +2532,10 @@ class _TransactionSheetState
                         });
                       },
               ),
-
               if (_type == 'Transfer') ...[
                 const SizedBox(height: 13),
-
                 _label('যে অ্যাকাউন্টে'),
-
                 const SizedBox(height: 6),
-
                 DropdownButtonFormField<String>(
                   value: _targetAccount,
                   isExpanded: true,
@@ -2433,10 +2560,8 @@ class _TransactionSheetState
                         },
                 ),
               ],
-
               if (_type != 'Transfer') ...[
                 const SizedBox(height: 13),
-
                 Row(
                   children: [
                     Expanded(
@@ -2457,9 +2582,7 @@ class _TransactionSheetState
                     ),
                   ],
                 ),
-
                 const SizedBox(height: 2),
-
                 DropdownButtonFormField<String>(
                   value:
                       _selectedCategory,
@@ -2486,13 +2609,9 @@ class _TransactionSheetState
                         },
                 ),
               ],
-
               const SizedBox(height: 13),
-
               _label('নোট'),
-
               const SizedBox(height: 6),
-
               TextField(
                 controller:
                     _noteController,
@@ -2508,9 +2627,7 @@ class _TransactionSheetState
                       'প্রয়োজনে নোট লিখুন',
                 ),
               ),
-
               const SizedBox(height: 18),
-
               SizedBox(
                 width: double.infinity,
                 height: 52,
