@@ -4,7 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 class MoneyTransaction {
   final int? id;
-  final String type; // Income, Expense, Transfer
+  final String type;
   final double amount;
   final String date;
   final String category;
@@ -39,17 +39,21 @@ class MoneyTransaction {
     return MoneyTransaction(
       id: map['id'] as int?,
       type: map['type']?.toString() ?? '',
-      amount: (map['amount'] as num?)?.toDouble() ?? 0.0,
+      amount:
+          (map['amount'] as num?)?.toDouble() ?? 0.0,
       date: map['date']?.toString() ?? '',
-      category: map['category']?.toString() ?? '',
-      account: map['account']?.toString() ?? '',
+      category:
+          map['category']?.toString() ?? '',
+      account:
+          map['account']?.toString() ?? '',
       note: map['note']?.toString(),
     );
   }
 }
 
 class MoneyDbHelper {
-  static final MoneyDbHelper instance = MoneyDbHelper._init();
+  static final MoneyDbHelper instance =
+      MoneyDbHelper._init();
 
   static Database? _database;
 
@@ -67,7 +71,8 @@ class MoneyDbHelper {
     'Card',
   ];
 
-  static const String _accountsKey = 'money_manager_accounts';
+  static const String _accountsKey =
+      'money_manager_accounts';
 
   // ============================================================
   // DATABASE
@@ -78,18 +83,20 @@ class MoneyDbHelper {
       return _database!;
     }
 
-    _database = await _initDB('sohoz_money_manager.db');
+    _database =
+        await _initDB('sohoz_money_manager.db');
 
     return _database!;
   }
 
-  Future<Database> _initDB(String fileName) async {
-    final dbPath = await getDatabasesPath();
+  Future<Database> _initDB(
+    String fileName,
+  ) async {
+    final dbPath =
+        await getDatabasesPath();
 
-    final dbFilePath = join(
-      dbPath,
-      fileName,
-    );
+    final dbFilePath =
+        join(dbPath, fileName);
 
     return await openDatabase(
       dbFilePath,
@@ -124,35 +131,47 @@ class MoneyDbHelper {
   // ============================================================
 
   Future<List<String>> getAccounts() async {
-    final prefs = await SharedPreferences.getInstance();
+    final prefs =
+        await SharedPreferences.getInstance();
 
-    final savedAccounts = prefs.getStringList(
+    final savedAccounts =
+        prefs.getStringList(
       _accountsKey,
     );
 
-    if (savedAccounts == null || savedAccounts.isEmpty) {
+    if (savedAccounts == null ||
+        savedAccounts.isEmpty) {
       await prefs.setStringList(
         _accountsKey,
         defaultAccounts,
       );
 
-      return List<String>.from(defaultAccounts);
+      return List<String>.from(
+        defaultAccounts,
+      );
     }
 
-    return List<String>.from(savedAccounts);
+    return List<String>.from(
+      savedAccounts,
+    );
   }
 
-  Future<bool> addAccount(String account) async {
+  Future<bool> addAccount(
+    String account,
+  ) async {
     final name = account.trim();
 
     if (name.isEmpty) {
       return false;
     }
 
-    final accounts = await getAccounts();
+    final accounts =
+        await getAccounts();
 
     final exists = accounts.any(
-      (item) => item.toLowerCase() == name.toLowerCase(),
+      (item) =>
+          item.toLowerCase() ==
+          name.toLowerCase(),
     );
 
     if (exists) {
@@ -161,7 +180,8 @@ class MoneyDbHelper {
 
     accounts.add(name);
 
-    final prefs = await SharedPreferences.getInstance();
+    final prefs =
+        await SharedPreferences.getInstance();
 
     return await prefs.setStringList(
       _accountsKey,
@@ -169,16 +189,20 @@ class MoneyDbHelper {
     );
   }
 
-  Future<bool> deleteAccount(String account) async {
+  Future<bool> deleteAccount(
+    String account,
+  ) async {
     if (defaultAccounts.contains(account)) {
       return false;
     }
 
-    final accounts = await getAccounts();
+    final accounts =
+        await getAccounts();
 
     accounts.remove(account);
 
-    final prefs = await SharedPreferences.getInstance();
+    final prefs =
+        await SharedPreferences.getInstance();
 
     return await prefs.setStringList(
       _accountsKey,
@@ -187,54 +211,64 @@ class MoneyDbHelper {
   }
 
   // ============================================================
-  // INSERT TRANSACTION
+  // INSERT
   // ============================================================
 
   Future<int> insertTransaction(
     MoneyTransaction transaction,
   ) async {
-    final db = await instance.database;
+    final db =
+        await instance.database;
 
-    final data = transaction.toMap();
+    final data =
+        transaction.toMap();
 
     data.remove('id');
 
     return await db.insert(
       'transactions',
       data,
-      conflictAlgorithm: ConflictAlgorithm.replace,
+      conflictAlgorithm:
+          ConflictAlgorithm.replace,
     );
   }
 
   // ============================================================
-  // GET ALL TRANSACTIONS
+  // GET ALL
   // ============================================================
 
-  Future<List<MoneyTransaction>> getAllTransactions() async {
-    final db = await instance.database;
+  Future<List<MoneyTransaction>>
+      getAllTransactions() async {
+    final db =
+        await instance.database;
 
-    final result = await db.query(
+    final result =
+        await db.query(
       'transactions',
       orderBy: 'id DESC',
     );
 
     return result
         .map(
-          (json) => MoneyTransaction.fromMap(json),
+          (json) =>
+              MoneyTransaction.fromMap(json),
         )
         .toList();
   }
 
   // ============================================================
-  // GET TRANSACTIONS BY TYPE
+  // GET BY TYPE
   // ============================================================
 
-  Future<List<MoneyTransaction>> getTransactionsByType(
+  Future<List<MoneyTransaction>>
+      getTransactionsByType(
     String type,
   ) async {
-    final db = await instance.database;
+    final db =
+        await instance.database;
 
-    final result = await db.query(
+    final result =
+        await db.query(
       'transactions',
       where: 'type = ?',
       whereArgs: [type],
@@ -243,21 +277,25 @@ class MoneyDbHelper {
 
     return result
         .map(
-          (json) => MoneyTransaction.fromMap(json),
+          (json) =>
+              MoneyTransaction.fromMap(json),
         )
         .toList();
   }
 
   // ============================================================
-  // GET TRANSACTIONS BY DATE
+  // GET BY DATE
   // ============================================================
 
-  Future<List<MoneyTransaction>> getTransactionsByDate(
+  Future<List<MoneyTransaction>>
+      getTransactionsByDate(
     String date,
   ) async {
-    final db = await instance.database;
+    final db =
+        await instance.database;
 
-    final result = await db.query(
+    final result =
+        await db.query(
       'transactions',
       where: 'date = ?',
       whereArgs: [date],
@@ -266,21 +304,25 @@ class MoneyDbHelper {
 
     return result
         .map(
-          (json) => MoneyTransaction.fromMap(json),
+          (json) =>
+              MoneyTransaction.fromMap(json),
         )
         .toList();
   }
 
   // ============================================================
-  // GET TRANSACTIONS BY CATEGORY
+  // GET BY CATEGORY
   // ============================================================
 
-  Future<List<MoneyTransaction>> getTransactionsByCategory(
+  Future<List<MoneyTransaction>>
+      getTransactionsByCategory(
     String category,
   ) async {
-    final db = await instance.database;
+    final db =
+        await instance.database;
 
-    final result = await db.query(
+    final result =
+        await db.query(
       'transactions',
       where: 'category = ?',
       whereArgs: [category],
@@ -289,21 +331,25 @@ class MoneyDbHelper {
 
     return result
         .map(
-          (json) => MoneyTransaction.fromMap(json),
+          (json) =>
+              MoneyTransaction.fromMap(json),
         )
         .toList();
   }
 
   // ============================================================
-  // GET TRANSACTIONS BY ACCOUNT
+  // GET BY ACCOUNT
   // ============================================================
 
-  Future<List<MoneyTransaction>> getTransactionsByAccount(
+  Future<List<MoneyTransaction>>
+      getTransactionsByAccount(
     String account,
   ) async {
-    final db = await instance.database;
+    final db =
+        await instance.database;
 
-    final result = await db.query(
+    final result =
+        await db.query(
       'transactions',
       where: 'account = ?',
       whereArgs: [account],
@@ -312,13 +358,14 @@ class MoneyDbHelper {
 
     return result
         .map(
-          (json) => MoneyTransaction.fromMap(json),
+          (json) =>
+              MoneyTransaction.fromMap(json),
         )
         .toList();
   }
 
   // ============================================================
-  // UPDATE TRANSACTION
+  // UPDATE
   // ============================================================
 
   Future<int> updateTransaction(
@@ -328,9 +375,11 @@ class MoneyDbHelper {
       return 0;
     }
 
-    final db = await instance.database;
+    final db =
+        await instance.database;
 
-    final data = transaction.toMap();
+    final data =
+        transaction.toMap();
 
     data.remove('id');
 
@@ -343,13 +392,14 @@ class MoneyDbHelper {
   }
 
   // ============================================================
-  // DELETE TRANSACTION
+  // DELETE
   // ============================================================
 
   Future<int> deleteTransaction(
     int id,
   ) async {
-    final db = await instance.database;
+    final db =
+        await instance.database;
 
     return await db.delete(
       'transactions',
@@ -359,11 +409,12 @@ class MoneyDbHelper {
   }
 
   // ============================================================
-  // DELETE ALL TRANSACTIONS
+  // DELETE ALL
   // ============================================================
 
   Future<int> deleteAllTransactions() async {
-    final db = await instance.database;
+    final db =
+        await instance.database;
 
     return await db.delete(
       'transactions',
@@ -371,17 +422,90 @@ class MoneyDbHelper {
   }
 
   // ============================================================
-  // COUNT TRANSACTIONS
+  // RESTORE BACKUP
+  // ============================================================
+
+  Future<void> restoreBackup({
+    required List<String> accounts,
+    required List<MoneyTransaction>
+        transactions,
+  }) async {
+    final db =
+        await instance.database;
+
+    await db.transaction(
+      (txn) async {
+        // পুরোনো transaction মুছে দিচ্ছি
+        await txn.delete(
+          'transactions',
+        );
+
+        // Backup-এর transaction ঢুকানো
+        for (final transaction
+            in transactions) {
+          final data =
+              transaction.toMap();
+
+          // পুরোনো ID রাখছি না।
+          // SQLite নতুন ID তৈরি করবে।
+          data.remove('id');
+
+          await txn.insert(
+            'transactions',
+            data,
+            conflictAlgorithm:
+                ConflictAlgorithm.replace,
+          );
+        }
+      },
+    );
+
+    // Restore accounts
+    final prefs =
+        await SharedPreferences.getInstance();
+
+    final cleanAccounts =
+        accounts
+            .map(
+              (item) => item.trim(),
+            )
+            .where(
+              (item) => item.isNotEmpty,
+            )
+            .toSet()
+            .toList();
+
+    if (cleanAccounts.isEmpty) {
+      await prefs.setStringList(
+        _accountsKey,
+        defaultAccounts,
+      );
+    } else {
+      await prefs.setStringList(
+        _accountsKey,
+        cleanAccounts,
+      );
+    }
+  }
+
+  // ============================================================
+  // COUNT
   // ============================================================
 
   Future<int> getTransactionCount() async {
-    final db = await instance.database;
+    final db =
+        await instance.database;
 
-    final result = await db.rawQuery(
-      'SELECT COUNT(*) as count FROM transactions',
+    final result =
+        await db.rawQuery(
+      'SELECT COUNT(*) as count '
+      'FROM transactions',
     );
 
-    return Sqflite.firstIntValue(result) ?? 0;
+    return Sqflite.firstIntValue(
+          result,
+        ) ??
+        0;
   }
 
   // ============================================================
@@ -389,15 +513,18 @@ class MoneyDbHelper {
   // ============================================================
 
   Future<double> getTotalIncome() async {
-    final db = await instance.database;
+    final db =
+        await instance.database;
 
-    final result = await db.rawQuery('''
+    final result =
+        await db.rawQuery('''
       SELECT SUM(amount) as total
       FROM transactions
       WHERE type = 'Income'
     ''');
 
-    final value = result.first['total'];
+    final value =
+        result.first['total'];
 
     if (value == null) {
       return 0.0;
@@ -411,15 +538,18 @@ class MoneyDbHelper {
   // ============================================================
 
   Future<double> getTotalExpense() async {
-    final db = await instance.database;
+    final db =
+        await instance.database;
 
-    final result = await db.rawQuery('''
+    final result =
+        await db.rawQuery('''
       SELECT SUM(amount) as total
       FROM transactions
       WHERE type = 'Expense'
     ''');
 
-    final value = result.first['total'];
+    final value =
+        result.first['total'];
 
     if (value == null) {
       return 0.0;
@@ -433,8 +563,11 @@ class MoneyDbHelper {
   // ============================================================
 
   Future<double> getBalance() async {
-    final income = await getTotalIncome();
-    final expense = await getTotalExpense();
+    final income =
+        await getTotalIncome();
+
+    final expense =
+        await getTotalExpense();
 
     return income - expense;
   }
