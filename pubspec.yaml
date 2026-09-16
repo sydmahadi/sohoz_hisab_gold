@@ -5,7 +5,7 @@ publish_to: 'none'
 version: 1.0.0+2
 
 environment:
-  sdk: ">=3.9.0 <4.0.0"
+  sdk: ">=3.0.0 <4.0.0"
 
 dependencies:
   flutter:
@@ -26,11 +26,6 @@ dependencies:
   printing: ^5.14.3
   screenshot: ^3.0.0
   gal: ^2.3.3
-
-  # Google Drive Backup & Restore
-  google_sign_in: ^7.2.0
-  googleapis: ^17.0.0
-  extension_google_sign_in_as_googleapis_auth: ^3.0.0
 
 dev_dependencies:
   flutter_test:
