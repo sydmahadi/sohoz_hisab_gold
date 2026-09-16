@@ -217,8 +217,6 @@ class _MoneyManagerScreenState extends State<MoneyManagerScreen> {
       return false;
     }).toList();
 
-    // নতুন তারিখ আগে
-    // একই তারিখ হলে নতুন ID আগে
     result.sort((a, b) {
       final dateA = _parseDate(a.date);
       final dateB = _parseDate(b.date);
@@ -574,8 +572,6 @@ class _MoneyManagerScreenState extends State<MoneyManagerScreen> {
 
                     const SizedBox(height: 20),
 
-                    // AMOUNT
-
                     TextField(
                       controller: amountController,
                       keyboardType:
@@ -595,8 +591,6 @@ class _MoneyManagerScreenState extends State<MoneyManagerScreen> {
                     ),
 
                     const SizedBox(height: 16),
-
-                    // INCOME / EXPENSE
 
                     if (type != 'Transfer') ...[
                       DropdownButtonFormField<String>(
@@ -672,8 +666,6 @@ class _MoneyManagerScreenState extends State<MoneyManagerScreen> {
                       ),
                     ],
 
-                    // TRANSFER
-
                     if (type == 'Transfer') ...[
                       DropdownButtonFormField<String>(
                         value: fromAccount,
@@ -730,8 +722,6 @@ class _MoneyManagerScreenState extends State<MoneyManagerScreen> {
 
                     const SizedBox(height: 16),
 
-                    // DATE
-
                     InkWell(
                       onTap: () async {
                         final picked =
@@ -769,8 +759,6 @@ class _MoneyManagerScreenState extends State<MoneyManagerScreen> {
                     ),
 
                     const SizedBox(height: 16),
-
-                    // NOTE
 
                     TextField(
                       controller: noteController,
@@ -919,6 +907,581 @@ class _MoneyManagerScreenState extends State<MoneyManagerScreen> {
   }
 
   // ============================================================
+  // EDIT TRANSACTION
+  // ============================================================
+
+  Future<void> _showEditTransactionSheet(
+    MoneyTransaction transaction,
+  ) async {
+    String type = transaction.type;
+
+    String? category;
+    String? account;
+    String? fromAccount;
+    String? toAccount;
+
+    // ------------------------------------------------------------
+    // LOAD OLD DATA
+    // ------------------------------------------------------------
+
+    if (type == 'Transfer') {
+      final parts = transaction.account.split('➔');
+
+      if (parts.length == 2) {
+        fromAccount = parts[0];
+        toAccount = parts[1];
+      }
+    } else {
+      category = transaction.category;
+      account = transaction.account;
+    }
+
+    final amountController = TextEditingController(
+      text: transaction.amount.toStringAsFixed(2),
+    );
+
+    final noteController = TextEditingController(
+      text: transaction.note ?? '',
+    );
+
+    DateTime selectedDate =
+        _parseDate(transaction.date) ?? DateTime.now();
+
+    await showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (sheetContext) {
+        return StatefulBuilder(
+          builder: (context, setSheetState) {
+            final categories = type == 'Income'
+                ? List<String>.from(_incomeCategories)
+                : List<String>.from(_expenseCategories);
+
+            // Custom category হলে সেটিও dropdown-এ দেখাবে
+            if (type != 'Transfer' &&
+                category != null &&
+                !categories.contains(category)) {
+              categories.add(category!);
+            }
+
+            // Custom account হলে সেটিও dropdown-এ দেখাবে
+            final editAccounts =
+                List<String>.from(_accounts);
+
+            if (type != 'Transfer' &&
+                account != null &&
+                !editAccounts.contains(account)) {
+              editAccounts.add(account!);
+            }
+
+            if (type == 'Transfer') {
+              if (fromAccount != null &&
+                  !editAccounts.contains(fromAccount)) {
+                editAccounts.add(fromAccount!);
+              }
+
+              if (toAccount != null &&
+                  !editAccounts.contains(toAccount)) {
+                editAccounts.add(toAccount!);
+              }
+            }
+
+            return Container(
+              height:
+                  MediaQuery.of(context).size.height * 0.90,
+              padding: EdgeInsets.only(
+                left: 20,
+                right: 20,
+                top: 20,
+                bottom:
+                    MediaQuery.of(context).viewInsets.bottom +
+                        20,
+              ),
+              decoration: BoxDecoration(
+                color: AppTheme.background,
+                borderRadius:
+                    const BorderRadius.vertical(
+                  top: Radius.circular(28),
+                ),
+              ),
+              child: SingleChildScrollView(
+                child: Column(
+                  crossAxisAlignment:
+                      CrossAxisAlignment.start,
+                  children: [
+                    // ------------------------------------------------
+                    // HANDLE
+                    // ------------------------------------------------
+
+                    Center(
+                      child: Container(
+                        width: 45,
+                        height: 5,
+                        decoration: BoxDecoration(
+                          color:
+                              AppTheme.textMuted.withValues(
+                            alpha: 0.35,
+                          ),
+                          borderRadius:
+                              BorderRadius.circular(20),
+                        ),
+                      ),
+                    ),
+
+                    const SizedBox(height: 20),
+
+                    // ------------------------------------------------
+                    // TITLE
+                    // ------------------------------------------------
+
+                    Text(
+                      'লেনদেন সম্পাদনা',
+                      style: TextStyle(
+                        fontSize: 22,
+                        fontWeight: FontWeight.bold,
+                        color: AppTheme.textPrimary,
+                      ),
+                    ),
+
+                    const SizedBox(height: 20),
+
+                    // ------------------------------------------------
+                    // TYPE
+                    // ------------------------------------------------
+
+                    Text(
+                      'লেনদেনের ধরন',
+                      style: TextStyle(
+                        color: AppTheme.textMuted,
+                      ),
+                    ),
+
+                    const SizedBox(height: 8),
+
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _typeButton(
+                            title: 'আয়',
+                            icon:
+                                Icons.arrow_downward_rounded,
+                            selected:
+                                type == 'Income',
+                            color: Colors.blue,
+                            onTap: () {
+                              setSheetState(() {
+                                type = 'Income';
+                                category = null;
+                                account = null;
+                                fromAccount = null;
+                                toAccount = null;
+                              });
+                            },
+                          ),
+                        ),
+
+                        const SizedBox(width: 8),
+
+                        Expanded(
+                          child: _typeButton(
+                            title: 'ব্যয়',
+                            icon:
+                                Icons.arrow_upward_rounded,
+                            selected:
+                                type == 'Expense',
+                            color: Colors.redAccent,
+                            onTap: () {
+                              setSheetState(() {
+                                type = 'Expense';
+                                category = null;
+                                account = null;
+                                fromAccount = null;
+                                toAccount = null;
+                              });
+                            },
+                          ),
+                        ),
+
+                        const SizedBox(width: 8),
+
+                        Expanded(
+                          child: _typeButton(
+                            title: 'Transfer',
+                            icon:
+                                Icons.swap_horiz_rounded,
+                            selected:
+                                type == 'Transfer',
+                            color: Colors.orange,
+                            onTap: () {
+                              setSheetState(() {
+                                type = 'Transfer';
+                                category = null;
+                                account = null;
+                              });
+                            },
+                          ),
+                        ),
+                      ],
+                    ),
+
+                    const SizedBox(height: 20),
+
+                    // ------------------------------------------------
+                    // AMOUNT
+                    // ------------------------------------------------
+
+                    TextField(
+                      controller: amountController,
+                      keyboardType:
+                          const TextInputType.numberWithOptions(
+                        decimal: true,
+                      ),
+                      style: TextStyle(
+                        color: AppTheme.textPrimary,
+                      ),
+                      decoration:
+                          const InputDecoration(
+                        labelText: 'পরিমাণ',
+                        prefixText: '৳ ',
+                        border:
+                            OutlineInputBorder(),
+                      ),
+                    ),
+
+                    const SizedBox(height: 16),
+
+                    // ------------------------------------------------
+                    // INCOME / EXPENSE
+                    // ------------------------------------------------
+
+                    if (type != 'Transfer') ...[
+                      DropdownButtonFormField<String>(
+                        value: category,
+                        isExpanded: true,
+                        decoration:
+                            const InputDecoration(
+                          labelText: 'খাত / Category',
+                          border:
+                              OutlineInputBorder(),
+                        ),
+                        items: [
+                          ...categories.map(
+                            (item) {
+                              return DropdownMenuItem<String>(
+                                value: item,
+                                child: Text(item),
+                              );
+                            },
+                          ),
+                          const DropdownMenuItem<String>(
+                            value: '__add__',
+                            child: Text(
+                              '+ নতুন খাত যোগ করুন',
+                            ),
+                          ),
+                        ],
+                        onChanged: (value) async {
+                          if (value == '__add__') {
+                            final newCategory =
+                                await _addCategory(type);
+
+                            if (newCategory != null) {
+                              setSheetState(() {
+                                category =
+                                    newCategory;
+                              });
+                            }
+                          } else {
+                            setSheetState(() {
+                              category = value;
+                            });
+                          }
+                        },
+                      ),
+
+                      const SizedBox(height: 16),
+
+                      DropdownButtonFormField<String>(
+                        value: account,
+                        isExpanded: true,
+                        decoration:
+                            const InputDecoration(
+                          labelText: 'Account',
+                          border:
+                              OutlineInputBorder(),
+                        ),
+                        items: editAccounts.map(
+                          (item) {
+                            return DropdownMenuItem<String>(
+                              value: item,
+                              child: Text(item),
+                            );
+                          },
+                        ).toList(),
+                        onChanged: (value) {
+                          setSheetState(() {
+                            account = value;
+                          });
+                        },
+                      ),
+                    ],
+
+                    // ------------------------------------------------
+                    // TRANSFER
+                    // ------------------------------------------------
+
+                    if (type == 'Transfer') ...[
+                      DropdownButtonFormField<String>(
+                        value: fromAccount,
+                        isExpanded: true,
+                        decoration:
+                            const InputDecoration(
+                          labelText:
+                              'কোন Account থেকে',
+                          border:
+                              OutlineInputBorder(),
+                        ),
+                        items: editAccounts.map(
+                          (item) {
+                            return DropdownMenuItem<String>(
+                              value: item,
+                              child: Text(item),
+                            );
+                          },
+                        ).toList(),
+                        onChanged: (value) {
+                          setSheetState(() {
+                            fromAccount = value;
+                          });
+                        },
+                      ),
+
+                      const SizedBox(height: 16),
+
+                      DropdownButtonFormField<String>(
+                        value: toAccount,
+                        isExpanded: true,
+                        decoration:
+                            const InputDecoration(
+                          labelText:
+                              'কোন Account-এ',
+                          border:
+                              OutlineInputBorder(),
+                        ),
+                        items: editAccounts.map(
+                          (item) {
+                            return DropdownMenuItem<String>(
+                              value: item,
+                              child: Text(item),
+                            );
+                          },
+                        ).toList(),
+                        onChanged: (value) {
+                          setSheetState(() {
+                            toAccount = value;
+                          });
+                        },
+                      ),
+                    ],
+
+                    const SizedBox(height: 16),
+
+                    // ------------------------------------------------
+                    // DATE
+                    // ------------------------------------------------
+
+                    InkWell(
+                      onTap: () async {
+                        final picked =
+                            await showDatePicker(
+                          context: context,
+                          initialDate:
+                              selectedDate,
+                          firstDate:
+                              DateTime(2000),
+                          lastDate:
+                              DateTime(2100),
+                        );
+
+                        if (picked != null) {
+                          setSheetState(() {
+                            selectedDate = picked;
+                          });
+                        }
+                      },
+                      child: InputDecorator(
+                        decoration:
+                            const InputDecoration(
+                          labelText: 'তারিখ',
+                          border:
+                              OutlineInputBorder(),
+                        ),
+                        child: Text(
+                          DateFormat(
+                            'dd/MM/yyyy',
+                          ).format(
+                            selectedDate,
+                          ),
+                        ),
+                      ),
+                    ),
+
+                    const SizedBox(height: 16),
+
+                    // ------------------------------------------------
+                    // NOTE
+                    // ------------------------------------------------
+
+                    TextField(
+                      controller: noteController,
+                      maxLines: 2,
+                      style: TextStyle(
+                        color: AppTheme.textPrimary,
+                      ),
+                      decoration:
+                          const InputDecoration(
+                        labelText: 'নোট',
+                        border:
+                            OutlineInputBorder(),
+                      ),
+                    ),
+
+                    const SizedBox(height: 24),
+
+                    // ------------------------------------------------
+                    // UPDATE BUTTON
+                    // ------------------------------------------------
+
+                    SizedBox(
+                      width: double.infinity,
+                      height: 52,
+                      child: ElevatedButton.icon(
+                        onPressed: () async {
+                          final amount =
+                              double.tryParse(
+                            amountController.text
+                                .trim()
+                                .replaceAll(',', ''),
+                          );
+
+                          if (amount == null ||
+                              amount <= 0) {
+                            _showMessage(
+                              'সঠিক পরিমাণ লিখুন',
+                            );
+                            return;
+                          }
+
+                          if (type != 'Transfer' &&
+                              category == null) {
+                            _showMessage(
+                              'একটি খাত নির্বাচন করুন',
+                            );
+                            return;
+                          }
+
+                          if (type != 'Transfer' &&
+                              account == null) {
+                            _showMessage(
+                              'একটি Account নির্বাচন করুন',
+                            );
+                            return;
+                          }
+
+                          if (type == 'Transfer') {
+                            if (fromAccount == null ||
+                                toAccount == null) {
+                              _showMessage(
+                                'উভয় Account নির্বাচন করুন',
+                              );
+                              return;
+                            }
+
+                            if (fromAccount ==
+                                toAccount) {
+                              _showMessage(
+                                'একই Account-এ Transfer করা যাবে না',
+                              );
+                              return;
+                            }
+                          }
+
+                          final finalAccount =
+                              type == 'Transfer'
+                                  ? '$fromAccount➔$toAccount'
+                                  : account!;
+
+                          final updatedTransaction =
+                              MoneyTransaction(
+                            id: transaction.id,
+                            type: type,
+                            amount: amount,
+                            date: DateFormat(
+                              'dd/MM/yyyy',
+                            ).format(
+                              selectedDate,
+                            ),
+                            category:
+                                type == 'Transfer'
+                                    ? 'Transfer'
+                                    : category!,
+                            account: finalAccount,
+                            note: noteController.text
+                                    .trim()
+                                    .isEmpty
+                                ? null
+                                : noteController.text
+                                    .trim(),
+                          );
+
+                          final updated =
+                              await MoneyDbHelper
+                                  .instance
+                                  .updateTransaction(
+                            updatedTransaction,
+                          );
+
+                          if (!mounted) return;
+
+                          if (updated > 0) {
+                            Navigator.pop(
+                              sheetContext,
+                            );
+
+                            await _loadData();
+
+                            _showMessage(
+                              'লেনদেন আপডেট হয়েছে',
+                            );
+                          } else {
+                            _showMessage(
+                              'লেনদেন আপডেট করা যায়নি',
+                            );
+                          }
+                        },
+                        icon: const Icon(
+                          Icons.edit_rounded,
+                        ),
+                        label: const Text(
+                          'আপডেট করুন',
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+
+    amountController.dispose();
+    noteController.dispose();
+  }
+
+  // ============================================================
   // TYPE BUTTON
   // ============================================================
 
@@ -950,8 +1513,7 @@ class _MoneyManagerScreenState extends State<MoneyManagerScreen> {
           border: Border.all(
             color: selected
                 ? color
-                : AppTheme.textMuted
-                    .withValues(
+                : AppTheme.textMuted.withValues(
                     alpha: 0.15,
                   ),
           ),
@@ -1435,6 +1997,11 @@ class _MoneyManagerScreenState extends State<MoneyManagerScreen> {
           type: type,
           transactions: transactions,
           onDeleted: _loadData,
+          onEdited: (transaction) async {
+            await _showEditTransactionSheet(
+              transaction,
+            );
+          },
         ),
       ),
     );
@@ -1534,7 +2101,6 @@ class _MoneyManagerScreenState extends State<MoneyManagerScreen> {
       ),
       child: Column(
         children: [
-          // DATE HEADER
           Container(
             padding:
                 const EdgeInsets.symmetric(
@@ -1590,8 +2156,7 @@ class _MoneyManagerScreenState extends State<MoneyManagerScreen> {
                     ),
                     style: TextStyle(
                       color:
-                          AppTheme
-                              .textPrimary,
+                          AppTheme.textPrimary,
                       fontSize: 15,
                       fontWeight:
                           FontWeight.bold,
@@ -1609,8 +2174,7 @@ class _MoneyManagerScreenState extends State<MoneyManagerScreen> {
                   decoration:
                       BoxDecoration(
                     color:
-                        AppTheme.gold
-                            .withValues(
+                        AppTheme.gold.withValues(
                       alpha: 0.12,
                     ),
                     borderRadius:
@@ -1633,7 +2197,6 @@ class _MoneyManagerScreenState extends State<MoneyManagerScreen> {
             ),
           ),
 
-          // TRANSACTIONS
           ...List.generate(
             transactions.length,
             (index) {
@@ -1801,26 +2364,48 @@ class _MoneyManagerScreenState extends State<MoneyManagerScreen> {
             ),
           ),
 
+          // ========================================================
+          // EDIT + DELETE MENU
+          // ========================================================
+
           PopupMenuButton<String>(
-            onSelected:
-                (value) {
-              if (value ==
-                  'delete') {
+            onSelected: (value) {
+              if (value == 'edit') {
+                _showEditTransactionSheet(
+                  transaction,
+                );
+              }
+
+              if (value == 'delete') {
                 _deleteTransaction(
                   transaction,
                 );
               }
             },
-            itemBuilder:
-                (context) {
+            itemBuilder: (context) {
               return const [
+                PopupMenuItem(
+                  value: 'edit',
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.edit_outlined,
+                      ),
+                      SizedBox(
+                        width: 8,
+                      ),
+                      Text(
+                        'সম্পাদনা করুন',
+                      ),
+                    ],
+                  ),
+                ),
                 PopupMenuItem(
                   value: 'delete',
                   child: Row(
                     children: [
                       Icon(
-                        Icons
-                            .delete_outline,
+                        Icons.delete_outline,
                       ),
                       SizedBox(
                         width: 8,
@@ -2349,7 +2934,6 @@ class _MoneyManagerScreenState extends State<MoneyManagerScreen> {
       ),
       child: Column(
         children: [
-          // HEADER
           Row(
             children: [
               Container(
@@ -2434,7 +3018,6 @@ class _MoneyManagerScreenState extends State<MoneyManagerScreen> {
             height: 18,
           ),
 
-          // PIE
           SizedBox(
             height: 250,
             child: Stack(
@@ -2582,7 +3165,6 @@ class _MoneyManagerScreenState extends State<MoneyManagerScreen> {
             height: 8,
           ),
 
-          // LEGEND
           ...List.generate(
             entries.length,
             (index) {
@@ -2953,8 +3535,7 @@ class _MoneyManagerScreenState extends State<MoneyManagerScreen> {
                       .withValues(
                     alpha: 0.14,
                   ),
-                  shape:
-                      BoxShape.circle,
+                  shape: BoxShape.circle,
                 ),
                 child: Icon(
                   Icons
@@ -3312,12 +3893,17 @@ class CategoryTransactionsScreen
   final Future<void> Function()
       onDeleted;
 
+  final Future<void> Function(
+    MoneyTransaction transaction,
+  ) onEdited;
+
   const CategoryTransactionsScreen({
     super.key,
     required this.category,
     required this.type,
     required this.transactions,
     required this.onDeleted,
+    required this.onEdited,
   });
 
   @override
@@ -3340,10 +3926,19 @@ class _CategoryTransactionsScreenState
       widget.transactions,
     );
 
+    _sortTransactions();
+  }
+
+  // ============================================================
+  // SORT
+  // ============================================================
+
+  void _sortTransactions() {
     _transactions.sort(
       (a, b) {
         DateTime? dateA =
             _parseDate(a.date);
+
         DateTime? dateB =
             _parseDate(b.date);
 
@@ -3375,6 +3970,10 @@ class _CategoryTransactionsScreenState
     );
   }
 
+  // ============================================================
+  // DATE PARSER
+  // ============================================================
+
   DateTime? _parseDate(
     String value,
   ) {
@@ -3400,11 +3999,52 @@ class _CategoryTransactionsScreenState
     );
   }
 
+  // ============================================================
+  // MONEY
+  // ============================================================
+
   String _money(
     double value,
   ) {
     return '৳ ${value.toStringAsFixed(2)}';
   }
+
+  // ============================================================
+  // EDIT TRANSACTION
+  // ============================================================
+
+  Future<void> _editTransaction(
+    MoneyTransaction transaction,
+  ) async {
+    await widget.onEdited(
+      transaction,
+    );
+
+    if (!mounted) return;
+
+    // Main database থেকে আবার সব transaction নিয়ে আসবে
+    final updated =
+        await MoneyDbHelper
+            .instance
+            .getAllTransactions();
+
+    final filtered =
+        updated.where((item) {
+      return item.type ==
+              widget.type &&
+          item.category ==
+              widget.category;
+    }).toList();
+
+    setState(() {
+      _transactions = filtered;
+      _sortTransactions();
+    });
+  }
+
+  // ============================================================
+  // DELETE TRANSACTION
+  // ============================================================
 
   Future<void> _deleteTransaction(
     MoneyTransaction transaction,
@@ -3486,6 +4126,10 @@ class _CategoryTransactionsScreenState
       ),
     );
   }
+
+  // ============================================================
+  // BUILD
+  // ============================================================
 
   @override
   Widget build(
@@ -3593,6 +4237,7 @@ class _CategoryTransactionsScreenState
                           vertical:
                               5,
                         ),
+
                         leading:
                             CircleAvatar(
                           backgroundColor:
@@ -3610,6 +4255,7 @@ class _CategoryTransactionsScreenState
                                 color,
                           ),
                         ),
+
                         title: Text(
                           _money(
                             transaction
@@ -3624,6 +4270,7 @@ class _CategoryTransactionsScreenState
                                     .bold,
                           ),
                         ),
+
                         subtitle:
                             Column(
                           crossAxisAlignment:
@@ -3663,19 +4310,74 @@ class _CategoryTransactionsScreenState
                               ),
                           ],
                         ),
+
+                        // ==================================================
+                        // EDIT + DELETE
+                        // ==================================================
+
                         trailing:
-                            IconButton(
-                          onPressed:
-                              () {
-                            _deleteTransaction(
-                              transaction,
-                            );
+                            PopupMenuButton<String>(
+                          onSelected:
+                              (value) {
+                            if (value ==
+                                'edit') {
+                              _editTransaction(
+                                transaction,
+                              );
+                            }
+
+                            if (value ==
+                                'delete') {
+                              _deleteTransaction(
+                                transaction,
+                              );
+                            }
                           },
-                          icon:
-                              const Icon(
-                            Icons
-                                .delete_outline_rounded,
-                          ),
+                          itemBuilder:
+                              (context) {
+                            return const [
+                              PopupMenuItem(
+                                value:
+                                    'edit',
+                                child:
+                                    Row(
+                                  children: [
+                                    Icon(
+                                      Icons
+                                          .edit_outlined,
+                                    ),
+                                    SizedBox(
+                                      width:
+                                          8,
+                                    ),
+                                    Text(
+                                      'সম্পাদনা করুন',
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              PopupMenuItem(
+                                value:
+                                    'delete',
+                                child:
+                                    Row(
+                                  children: [
+                                    Icon(
+                                      Icons
+                                          .delete_outline_rounded,
+                                    ),
+                                    SizedBox(
+                                      width:
+                                          8,
+                                    ),
+                                    Text(
+                                      'মুছে ফেলুন',
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ];
+                          },
                         ),
                       ),
                     );
