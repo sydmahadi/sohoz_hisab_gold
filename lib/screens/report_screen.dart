@@ -1,4 +1,3 @@
-import 'dart:math';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
@@ -85,7 +84,7 @@ class _ReportScreenState extends State<ReportScreen> {
   }
 
   // ============================================================
-  // DATE
+  // DATE PARSER
   // ============================================================
 
   DateTime? _parseDate(String date) {
@@ -140,10 +139,10 @@ class _ReportScreenState extends State<ReportScreen> {
       if (da == null) return 1;
       if (db == null) return -1;
 
-      final result = da.compareTo(db);
+      final dateResult = da.compareTo(db);
 
-      if (result != 0) {
-        return result;
+      if (dateResult != 0) {
+        return dateResult;
       }
 
       return (a.id ?? 0).compareTo(b.id ?? 0);
@@ -216,9 +215,8 @@ class _ReportScreenState extends State<ReportScreen> {
   }
 
   Map<String, double> get _incomeCategories {
-    final result = _categoryTotals(
-      _incomeTransactions,
-    );
+    final result =
+        _categoryTotals(_incomeTransactions);
 
     final entries = result.entries.toList()
       ..sort(
@@ -229,9 +227,8 @@ class _ReportScreenState extends State<ReportScreen> {
   }
 
   Map<String, double> get _expenseCategories {
-    final result = _categoryTotals(
-      _expenseTransactions,
-    );
+    final result =
+        _categoryTotals(_expenseTransactions);
 
     final entries = result.entries.toList()
       ..sort(
@@ -297,16 +294,18 @@ class _ReportScreenState extends State<ReportScreen> {
       return [];
     }
 
-    final selected = _selectedCategory!.trim();
+    final selected =
+        _selectedCategory!.trim();
 
     final result = _monthlyTransactions.where((item) {
       final sameType =
           item.type.toLowerCase() ==
               _categoryType.toLowerCase();
 
-      final itemCategory = item.category.trim().isEmpty
-          ? 'অন্যান্য'
-          : item.category.trim();
+      final itemCategory =
+          item.category.trim().isEmpty
+              ? 'অন্যান্য'
+              : item.category.trim();
 
       return sameType &&
           itemCategory.toLowerCase() ==
@@ -324,10 +323,10 @@ class _ReportScreenState extends State<ReportScreen> {
       if (da == null) return 1;
       if (db == null) return -1;
 
-      final dateCompare = da.compareTo(db);
+      final dateResult = da.compareTo(db);
 
-      if (dateCompare != 0) {
-        return dateCompare;
+      if (dateResult != 0) {
+        return dateResult;
       }
 
       return (a.id ?? 0).compareTo(b.id ?? 0);
@@ -347,7 +346,8 @@ class _ReportScreenState extends State<ReportScreen> {
         _transactionsPerPage;
   }
 
-  List<MoneyTransaction> get _currentCategoryPageTransactions {
+  List<MoneyTransaction>
+      get _currentCategoryPageTransactions {
     final all = _categoryTransactions;
 
     if (all.isEmpty) {
@@ -371,14 +371,6 @@ class _ReportScreenState extends State<ReportScreen> {
 
   double get _categoryGrandTotal {
     return _categoryTransactions.fold<double>(
-      0,
-      (sum, item) => sum + item.amount,
-    );
-  }
-
-  double get _currentCategoryPageTotal {
-    return _currentCategoryPageTransactions
-        .fold<double>(
       0,
       (sum, item) => sum + item.amount,
     );
@@ -438,7 +430,7 @@ class _ReportScreenState extends State<ReportScreen> {
   }
 
   // ============================================================
-  // TYPE / CATEGORY CHANGE
+  // CATEGORY TYPE / CATEGORY CHANGE
   // ============================================================
 
   void _changeCategoryType(String type) {
@@ -459,7 +451,7 @@ class _ReportScreenState extends State<ReportScreen> {
   }
 
   // ============================================================
-  // MONEY
+  // MONEY / DISPLAY
   // ============================================================
 
   String _money(double amount) {
@@ -492,8 +484,11 @@ class _ReportScreenState extends State<ReportScreen> {
   // ============================================================
 
   Widget _buildA4Report() {
-    final income = _incomeCategories.entries.toList();
-    final expense = _expenseCategories.entries.toList();
+    final income =
+        _incomeCategories.entries.toList();
+
+    final expense =
+        _expenseCategories.entries.toList();
 
     return Container(
       width: 794,
@@ -823,7 +818,7 @@ class _ReportScreenState extends State<ReportScreen> {
   }
 
   // ============================================================
-  // CATEGORY VOUCHER / PAGE
+  // CATEGORY VOUCHER
   // ============================================================
 
   Widget _buildCategoryVoucher({
@@ -831,9 +826,11 @@ class _ReportScreenState extends State<ReportScreen> {
     required int pageIndex,
     required int totalPages,
   }) {
-    final isIncome = _categoryType == 'Income';
+    final isIncome =
+        _categoryType == 'Income';
 
-    final pageTotal = transactions.fold<double>(
+    final pageTotal =
+        transactions.fold<double>(
       0,
       (sum, item) => sum + item.amount,
     );
@@ -1132,9 +1129,9 @@ class _ReportScreenState extends State<ReportScreen> {
       color: const Color(0xFFEFEFEF),
       child: Row(
         children: [
-          SizedBox(
+          const SizedBox(
             width: 38,
-            child: const Text(
+            child: Text(
               'নং',
               textAlign: TextAlign.center,
               style: TextStyle(
@@ -1144,9 +1141,9 @@ class _ReportScreenState extends State<ReportScreen> {
             ),
           ),
 
-          SizedBox(
+          const SizedBox(
             width: 95,
-            child: const Text(
+            child: Text(
               'তারিখ',
               textAlign: TextAlign.center,
               style: TextStyle(
@@ -1156,9 +1153,9 @@ class _ReportScreenState extends State<ReportScreen> {
             ),
           ),
 
-          Expanded(
+          const Expanded(
             flex: 2,
-            child: const Text(
+            child: Text(
               'বিবরণ / নোট',
               textAlign: TextAlign.left,
               style: TextStyle(
@@ -1168,9 +1165,9 @@ class _ReportScreenState extends State<ReportScreen> {
             ),
           ),
 
-          Expanded(
+          const Expanded(
             flex: 1,
-            child: const Text(
+            child: Text(
               'অ্যাকাউন্ট',
               textAlign: TextAlign.center,
               style: TextStyle(
@@ -1180,9 +1177,9 @@ class _ReportScreenState extends State<ReportScreen> {
             ),
           ),
 
-          SizedBox(
+          const SizedBox(
             width: 105,
-            child: const Text(
+            child: Text(
               'পরিমাণ',
               textAlign: TextAlign.right,
               style: TextStyle(
@@ -1200,7 +1197,8 @@ class _ReportScreenState extends State<ReportScreen> {
     int number,
     MoneyTransaction item,
   ) {
-    final note = item.note?.trim() ?? '';
+    final note =
+        item.note?.trim() ?? '';
 
     return Container(
       padding:
@@ -1254,7 +1252,8 @@ class _ReportScreenState extends State<ReportScreen> {
               child: Text(
                 note.isEmpty ? '—' : note,
                 maxLines: 3,
-                overflow: TextOverflow.ellipsis,
+                overflow:
+                    TextOverflow.ellipsis,
                 style: const TextStyle(
                   fontSize: 10,
                   fontWeight: FontWeight.w500,
@@ -1273,7 +1272,8 @@ class _ReportScreenState extends State<ReportScreen> {
               child: Text(
                 item.account,
                 maxLines: 2,
-                overflow: TextOverflow.ellipsis,
+                overflow:
+                    TextOverflow.ellipsis,
                 textAlign: TextAlign.center,
                 style: const TextStyle(
                   fontSize: 10,
@@ -1383,7 +1383,8 @@ class _ReportScreenState extends State<ReportScreen> {
         _selectedMonth,
       );
 
-      if (_reportMode == _ReportMode.monthly) {
+      if (_reportMode ==
+          _ReportMode.monthly) {
         final image =
             await _captureMonthlyImage();
 
@@ -1405,7 +1406,8 @@ class _ReportScreenState extends State<ReportScreen> {
 
         final category =
             _safeFileName(
-          _selectedCategory ?? 'Category',
+          _selectedCategory ??
+              'Category',
         );
 
         for (int page = 0;
@@ -1421,7 +1423,7 @@ class _ReportScreenState extends State<ReportScreen> {
             album: 'সহজ হিসাব',
             name:
                 'Shohoj_Hisab_${_categoryType}_'
-                '$category_$month'
+                '${category}_$month'
                 '_Page_${page + 1}',
           );
         }
@@ -1433,7 +1435,8 @@ class _ReportScreenState extends State<ReportScreen> {
           .showSnackBar(
         SnackBar(
           content: Text(
-            _reportMode == _ReportMode.monthly
+            _reportMode ==
+                    _ReportMode.monthly
                 ? 'রিপোর্টটি Gallery-তে Save হয়েছে'
                 : '${_categoryPageCount}টি Page Gallery-তে Save হয়েছে',
           ),
@@ -1478,7 +1481,8 @@ class _ReportScreenState extends State<ReportScreen> {
         _selectedMonth,
       );
 
-      if (_reportMode == _ReportMode.monthly) {
+      if (_reportMode ==
+          _ReportMode.monthly) {
         final image =
             await _captureMonthlyImage();
 
@@ -1515,7 +1519,8 @@ class _ReportScreenState extends State<ReportScreen> {
 
         final category =
             _safeFileName(
-          _selectedCategory ?? 'Category',
+          _selectedCategory ??
+              'Category',
         );
 
         for (int page = 0;
@@ -1557,7 +1562,8 @@ class _ReportScreenState extends State<ReportScreen> {
           .showSnackBar(
         SnackBar(
           content: Text(
-            _reportMode == _ReportMode.monthly
+            _reportMode ==
+                    _ReportMode.monthly
                 ? 'A4 PDF তৈরি হয়েছে'
                 : '${_categoryPageCount} পৃষ্ঠার PDF তৈরি হয়েছে',
           ),
@@ -1718,7 +1724,8 @@ class _ReportScreenState extends State<ReportScreen> {
           Expanded(
             child: _modeButton(
               title: 'মাসিক সারাংশ',
-              icon: Icons.analytics_outlined,
+              icon:
+                  Icons.analytics_outlined,
               selected:
                   _reportMode ==
                       _ReportMode.monthly,
@@ -1891,7 +1898,7 @@ class _ReportScreenState extends State<ReportScreen> {
         Container(
           width: double.infinity,
           padding:
-              const.symmetric(
+              const EdgeInsets.symmetric(
             horizontal: 14,
           ),
           decoration: BoxDecoration(
@@ -1933,7 +1940,8 @@ class _ReportScreenState extends State<ReportScreen> {
                   ),
                 )
               : DropdownButtonHideUnderline(
-                  child: DropdownButton<String>(
+                  child:
+                      DropdownButton<String>(
                     value: categories.contains(
                       _selectedCategory,
                     )
@@ -2035,7 +2043,7 @@ class _ReportScreenState extends State<ReportScreen> {
   }
 
   // ============================================================
-  // CATEGORY PAGE NAVIGATION
+  // PAGE NAVIGATION
   // ============================================================
 
   Widget _buildPageNavigation(
@@ -2307,7 +2315,6 @@ class _ReportScreenState extends State<ReportScreen> {
                 ),
                 child: Column(
                   children: [
-                    // Month
                     _buildMonthSelector(
                       Theme.of(context),
                       dark,
@@ -2315,7 +2322,6 @@ class _ReportScreenState extends State<ReportScreen> {
 
                     const SizedBox(height: 14),
 
-                    // Report mode
                     _buildReportModeSelector(
                       dark,
                     ),
@@ -2349,18 +2355,15 @@ class _ReportScreenState extends State<ReportScreen> {
       children: [
         Container(
           width: double.infinity,
-          padding:
-              const EdgeInsets.all(8),
-          decoration:
-              BoxDecoration(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
             color: Colors.grey.shade200,
             borderRadius:
                 BorderRadius.circular(12),
           ),
           child: FittedBox(
             fit: BoxFit.fitWidth,
-            alignment:
-                Alignment.topCenter,
+            alignment: Alignment.topCenter,
             child: Screenshot(
               controller:
                   _screenshotController,
