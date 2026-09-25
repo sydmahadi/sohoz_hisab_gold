@@ -1,3 +1,4 @@
+import 'dart:math';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
@@ -11,6 +12,11 @@ import 'package:screenshot/screenshot.dart';
 import '../theme/app_theme.dart';
 import '../logic/money_db_helper.dart';
 
+enum _ReportMode {
+  monthly,
+  category,
+}
+
 class ReportScreen extends StatefulWidget {
   const ReportScreen({super.key});
 
@@ -19,44 +25,25 @@ class ReportScreen extends StatefulWidget {
 }
 
 class _ReportScreenState extends State<ReportScreen> {
-  // ============================================================
-  // MONTHLY REPORT
-  // ============================================================
-
   DateTime _selectedMonth = DateTime.now();
 
-  // ============================================================
-  // CATEGORY REPORT
-  // ============================================================
-
-  String _categoryReportType = 'Income';
-
-  String? _selectedCategory;
-
   List<MoneyTransaction> _transactions = [];
-
-  // ============================================================
-  // STATES
-  // ============================================================
 
   bool _loading = true;
   bool _savingImage = false;
   bool _savingPdf = false;
-  bool _savingCategoryImage = false;
 
-  // ============================================================
-  // SCREENSHOT CONTROLLERS
-  // ============================================================
+  _ReportMode _reportMode = _ReportMode.monthly;
+
+  String _categoryType = 'Expense';
+  String? _selectedCategory;
+
+  int _categoryPage = 0;
 
   final ScreenshotController _screenshotController =
       ScreenshotController();
 
-  final ScreenshotController _categoryScreenshotController =
-      ScreenshotController();
-
-  // ============================================================
-  // INIT
-  // ============================================================
+  static const int _transactionsPerPage = 10;
 
   @override
   void initState() {
@@ -69,9 +56,11 @@ class _ReportScreenState extends State<ReportScreen> {
   // ============================================================
 
   Future<void> _loadReport() async {
-    setState(() {
-      _loading = true;
-    });
+    if (mounted) {
+      setState(() {
+        _loading = true;
+      });
+    }
 
     try {
       final data =
@@ -82,23 +71,21 @@ class _ReportScreenState extends State<ReportScreen> {
       setState(() {
         _transactions = data;
         _loading = false;
-
-        _updateSelectedCategory();
       });
-    } catch (e) {
+
+      _prepareCategory();
+    } catch (_) {
       if (!mounted) return;
 
       setState(() {
         _transactions = [];
         _loading = false;
-        _selectedCategory = null;
       });
     }
   }
 
   // ============================================================
-  // DATE PARSER
-  // Supports common database formats
+  // DATE
   // ============================================================
 
   DateTime? _parseDate(String date) {
@@ -116,7 +103,6 @@ class _ReportScreenState extends State<ReportScreen> {
       'dd.MM.yyyy HH:mm',
       'yyyy-MM-dd HH:mm:ss',
       'yyyy-MM-dd HH:mm',
-      'yyyy/MM/dd HH:mm:ss',
       'yyyy/MM/dd HH:mm',
     ];
 
@@ -126,11 +112,7 @@ class _ReportScreenState extends State<ReportScreen> {
       } catch (_) {}
     }
 
-    try {
-      return DateTime.tryParse(value);
-    } catch (_) {
-      return null;
-    }
+    return DateTime.tryParse(value);
   }
 
   // ============================================================
@@ -147,12 +129,28 @@ class _ReportScreenState extends State<ReportScreen> {
           date.month == _selectedMonth.month;
     }).toList();
 
+    result.sort((a, b) {
+      final da = _parseDate(a.date);
+      final db = _parseDate(b.date);
+
+      if (da == null && db == null) {
+        return (a.id ?? 0).compareTo(b.id ?? 0);
+      }
+
+      if (da == null) return 1;
+      if (db == null) return -1;
+
+      final result = da.compareTo(db);
+
+      if (result != 0) {
+        return result;
+      }
+
+      return (a.id ?? 0).compareTo(b.id ?? 0);
+    });
+
     return result;
   }
-
-  // ============================================================
-  // INCOME / EXPENSE / TRANSFER
-  // ============================================================
 
   List<MoneyTransaction> get _incomeTransactions {
     return _monthlyTransactions
@@ -178,10 +176,6 @@ class _ReportScreenState extends State<ReportScreen> {
         .toList();
   }
 
-  // ============================================================
-  // TOTALS
-  // ============================================================
-
   double get _totalIncome {
     return _incomeTransactions.fold<double>(
       0,
@@ -201,7 +195,7 @@ class _ReportScreenState extends State<ReportScreen> {
   }
 
   // ============================================================
-  // CATEGORY TOTAL
+  // CATEGORY TOTALS
   // ============================================================
 
   Map<String, double> _categoryTotals(
@@ -210,10 +204,9 @@ class _ReportScreenState extends State<ReportScreen> {
     final Map<String, double> result = {};
 
     for (final item in transactions) {
-      final category =
-          item.category.trim().isEmpty
-              ? 'অন্যান্য'
-              : item.category.trim();
+      final category = item.category.trim().isEmpty
+          ? 'অন্যান্য'
+          : item.category.trim();
 
       result[category] =
           (result[category] ?? 0) + item.amount;
@@ -223,8 +216,9 @@ class _ReportScreenState extends State<ReportScreen> {
   }
 
   Map<String, double> get _incomeCategories {
-    final result =
-        _categoryTotals(_incomeTransactions);
+    final result = _categoryTotals(
+      _incomeTransactions,
+    );
 
     final entries = result.entries.toList()
       ..sort(
@@ -235,8 +229,9 @@ class _ReportScreenState extends State<ReportScreen> {
   }
 
   Map<String, double> get _expenseCategories {
-    final result =
-        _categoryTotals(_expenseTransactions);
+    final result = _categoryTotals(
+      _expenseTransactions,
+    );
 
     final entries = result.entries.toList()
       ..sort(
@@ -247,14 +242,13 @@ class _ReportScreenState extends State<ReportScreen> {
   }
 
   // ============================================================
-  // CATEGORY REPORT AVAILABLE CATEGORIES
+  // CATEGORY REPORT
   // ============================================================
 
   List<String> get _availableCategories {
-    final List<MoneyTransaction> source =
-        _categoryReportType == 'Income'
-            ? _incomeTransactions
-            : _expenseTransactions;
+    final source = _categoryType == 'Income'
+        ? _incomeTransactions
+        : _expenseTransactions;
 
     final categories = source
         .map(
@@ -266,140 +260,132 @@ class _ReportScreenState extends State<ReportScreen> {
         .toList();
 
     categories.sort(
-      (a, b) => a.compareTo(b),
+      (a, b) => a.toLowerCase().compareTo(
+            b.toLowerCase(),
+          ),
     );
 
     return categories;
   }
 
-  // ============================================================
-  // UPDATE SELECTED CATEGORY
-  // ============================================================
-
-  void _updateSelectedCategory() {
+  void _prepareCategory() {
     final categories = _availableCategories;
 
     if (categories.isEmpty) {
-      _selectedCategory = null;
+      if (mounted) {
+        setState(() {
+          _selectedCategory = null;
+          _categoryPage = 0;
+        });
+      }
       return;
     }
 
     if (_selectedCategory == null ||
         !categories.contains(_selectedCategory)) {
-      _selectedCategory = categories.first;
+      if (mounted) {
+        setState(() {
+          _selectedCategory = categories.first;
+          _categoryPage = 0;
+        });
+      }
     }
   }
 
-  // ============================================================
-  // CATEGORY REPORT TRANSACTIONS
-  //
-  // Selected month:
-  // - Current month = 1st day -> today
-  // - Previous month = full selected month
-  // ============================================================
-
-  List<MoneyTransaction>
-      get _categoryReportTransactions {
+  List<MoneyTransaction> get _categoryTransactions {
     if (_selectedCategory == null) {
       return [];
     }
 
-    final now = DateTime.now();
+    final selected = _selectedCategory!.trim();
 
-    final firstDay = DateTime(
-      _selectedMonth.year,
-      _selectedMonth.month,
-      1,
-    );
-
-    DateTime lastDay;
-
-    final isCurrentMonth =
-        _selectedMonth.year == now.year &&
-        _selectedMonth.month == now.month;
-
-    if (isCurrentMonth) {
-      lastDay = DateTime(
-        now.year,
-        now.month,
-        now.day,
-        23,
-        59,
-        59,
-      );
-    } else {
-      lastDay = DateTime(
-        _selectedMonth.year,
-        _selectedMonth.month + 1,
-        0,
-        23,
-        59,
-        59,
-      );
-    }
-
-    final result = _transactions.where((item) {
-      final date = _parseDate(item.date);
-
-      if (date == null) return false;
-
-      final typeMatches =
+    final result = _monthlyTransactions.where((item) {
+      final sameType =
           item.type.toLowerCase() ==
-          _categoryReportType.toLowerCase();
+              _categoryType.toLowerCase();
 
-      final itemCategory =
-          item.category.trim().isEmpty
-              ? 'অন্যান্য'
-              : item.category.trim();
+      final itemCategory = item.category.trim().isEmpty
+          ? 'অন্যান্য'
+          : item.category.trim();
 
-      final categoryMatches =
-          itemCategory == _selectedCategory;
-
-      final dateMatches =
-          !date.isBefore(firstDay) &&
-          !date.isAfter(lastDay);
-
-      return typeMatches &&
-          categoryMatches &&
-          dateMatches;
+      return sameType &&
+          itemCategory.toLowerCase() ==
+              selected.toLowerCase();
     }).toList();
 
-    // Latest date first.
     result.sort((a, b) {
-      final dateA = _parseDate(a.date);
-      final dateB = _parseDate(b.date);
+      final da = _parseDate(a.date);
+      final db = _parseDate(b.date);
 
-      if (dateA == null && dateB == null) {
-        return 0;
+      if (da == null && db == null) {
+        return (a.id ?? 0).compareTo(b.id ?? 0);
       }
 
-      if (dateA == null) {
-        return 1;
+      if (da == null) return 1;
+      if (db == null) return -1;
+
+      final dateCompare = da.compareTo(db);
+
+      if (dateCompare != 0) {
+        return dateCompare;
       }
 
-      if (dateB == null) {
-        return -1;
-      }
-
-      return dateB.compareTo(dateA);
+      return (a.id ?? 0).compareTo(b.id ?? 0);
     });
 
     return result;
   }
 
-  // ============================================================
-  // CATEGORY REPORT TOTAL
-  // ============================================================
+  int get _categoryPageCount {
+    final count = _categoryTransactions.length;
 
-  double get _categoryReportTotal {
-    return _categoryReportTransactions.fold<double>(
+    if (count == 0) {
+      return 1;
+    }
+
+    return (count + _transactionsPerPage - 1) ~/
+        _transactionsPerPage;
+  }
+
+  List<MoneyTransaction> get _currentCategoryPageTransactions {
+    final all = _categoryTransactions;
+
+    if (all.isEmpty) {
+      return [];
+    }
+
+    final maxPage = _categoryPageCount - 1;
+
+    if (_categoryPage > maxPage) {
+      _categoryPage = maxPage;
+    }
+
+    final start =
+        _categoryPage * _transactionsPerPage;
+
+    return all
+        .skip(start)
+        .take(_transactionsPerPage)
+        .toList();
+  }
+
+  double get _categoryGrandTotal {
+    return _categoryTransactions.fold<double>(
+      0,
+      (sum, item) => sum + item.amount,
+    );
+  }
+
+  double get _currentCategoryPageTotal {
+    return _currentCategoryPageTransactions
+        .fold<double>(
       0,
       (sum, item) => sum + item.amount,
     );
   }
 
   // ============================================================
-  // MONTH
+  // MONTH NAVIGATION
   // ============================================================
 
   void _previousMonth() {
@@ -409,8 +395,10 @@ class _ReportScreenState extends State<ReportScreen> {
         _selectedMonth.month - 1,
       );
 
-      _updateSelectedCategory();
+      _categoryPage = 0;
     });
+
+    _prepareCategory();
   }
 
   void _nextMonth() {
@@ -420,8 +408,10 @@ class _ReportScreenState extends State<ReportScreen> {
         _selectedMonth.month + 1,
       );
 
-      _updateSelectedCategory();
+      _categoryPage = 0;
     });
+
+    _prepareCategory();
   }
 
   Future<void> _selectMonth() async {
@@ -441,21 +431,40 @@ class _ReportScreenState extends State<ReportScreen> {
         picked.month,
       );
 
-      _updateSelectedCategory();
+      _categoryPage = 0;
+    });
+
+    _prepareCategory();
+  }
+
+  // ============================================================
+  // TYPE / CATEGORY CHANGE
+  // ============================================================
+
+  void _changeCategoryType(String type) {
+    setState(() {
+      _categoryType = type;
+      _selectedCategory = null;
+      _categoryPage = 0;
+    });
+
+    _prepareCategory();
+  }
+
+  void _changeCategory(String? category) {
+    setState(() {
+      _selectedCategory = category;
+      _categoryPage = 0;
     });
   }
 
   // ============================================================
-  // MONEY FORMAT
+  // MONEY
   // ============================================================
 
   String _money(double amount) {
     return '৳ ${amount.toStringAsFixed(2)}';
   }
-
-  // ============================================================
-  // DATE DISPLAY
-  // ============================================================
 
   String _displayDate(String value) {
     final date = _parseDate(value);
@@ -467,6 +476,15 @@ class _ReportScreenState extends State<ReportScreen> {
     return DateFormat(
       'dd/MM/yyyy',
     ).format(date);
+  }
+
+  String _safeFileName(String value) {
+    return value
+        .replaceAll(
+          RegExp(r'[\\/:*?"<>|]'),
+          '_',
+        )
+        .replaceAll(' ', '_');
   }
 
   // ============================================================
@@ -489,7 +507,6 @@ class _ReportScreenState extends State<ReportScreen> {
       child: DefaultTextStyle(
         style: const TextStyle(
           color: Colors.black,
-          fontFamily: 'Arial',
         ),
         child: Column(
           crossAxisAlignment:
@@ -550,10 +567,12 @@ class _ReportScreenState extends State<ReportScreen> {
                       total: _totalIncome,
                     ),
                   ),
+
                   Container(
                     width: 1,
                     color: Colors.black54,
                   ),
+
                   Expanded(
                     child: _buildA4Side(
                       title: 'ব্যয়',
@@ -641,31 +660,20 @@ class _ReportScreenState extends State<ReportScreen> {
 
             const SizedBox(height: 22),
 
-            // ==================================================
-            // WATERMARK
-            // ==================================================
-
             Align(
               alignment: Alignment.bottomRight,
               child: Opacity(
                 opacity: 0.38,
                 child: SizedBox(
-                  width: 190,
-                  child: Column(
-                    crossAxisAlignment:
-                        CrossAxisAlignment.center,
-                    children: const [
-                      Text(
-                        'সহজ হিসাব অ্যাপ',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          color: Color(0xFF777777),
-                          fontSize: 10,
-                          fontWeight:
-                              FontWeight.w600,
-                        ),
-                      ),
-                    ],
+                  width: 150,
+                  child: const Text(
+                    'সহজ হিসাব',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: Color(0xFF777777),
+                      fontSize: 10,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                 ),
               ),
@@ -675,10 +683,6 @@ class _ReportScreenState extends State<ReportScreen> {
       ),
     );
   }
-
-  // ============================================================
-  // A4 SIDE
-  // ============================================================
 
   Widget _buildA4Side({
     required String title,
@@ -801,6 +805,7 @@ class _ReportScreenState extends State<ReportScreen> {
                   ),
                 ),
               ),
+
               Text(
                 _money(total),
                 style:
@@ -818,65 +823,33 @@ class _ReportScreenState extends State<ReportScreen> {
   }
 
   // ============================================================
-  // CATEGORY A4 REPORT
+  // CATEGORY VOUCHER / PAGE
   // ============================================================
 
-  Widget _buildCategoryA4Report() {
-    final transactions =
-        _categoryReportTransactions;
+  Widget _buildCategoryVoucher({
+    required List<MoneyTransaction> transactions,
+    required int pageIndex,
+    required int totalPages,
+  }) {
+    final isIncome = _categoryType == 'Income';
 
-    final isIncome =
-        _categoryReportType == 'Income';
-
-    final reportTitle =
-        isIncome
-            ? 'খাতভিত্তিক আয় রিপোর্ট'
-            : 'খাতভিত্তিক ব্যয় রিপোর্ট';
-
-    final typeTitle =
-        isIncome ? 'আয়' : 'ব্যয়';
-
-    final category =
-        _selectedCategory ?? 'কোনো খাত নির্বাচন করা হয়নি';
-
-    final now = DateTime.now();
-
-    final isCurrentMonth =
-        _selectedMonth.year == now.year &&
-        _selectedMonth.month == now.month;
-
-    String periodText;
-
-    if (isCurrentMonth) {
-      periodText =
-          '১ ${DateFormat('MMMM').format(_selectedMonth)} '
-          'থেকে ${DateFormat('dd/MM/yyyy').format(now)}';
-    } else {
-      final lastDate = DateTime(
-        _selectedMonth.year,
-        _selectedMonth.month + 1,
-        0,
-      );
-
-      periodText =
-          '০১/${DateFormat('MM').format(_selectedMonth)}/'
-          '${_selectedMonth.year} থেকে '
-          '${DateFormat('dd/MM/yyyy').format(lastDate)}';
-    }
+    final pageTotal = transactions.fold<double>(
+      0,
+      (sum, item) => sum + item.amount,
+    );
 
     return Container(
       width: 794,
       color: Colors.white,
       padding: const EdgeInsets.fromLTRB(
-        35,
-        35,
-        35,
+        32,
+        30,
+        32,
         28,
       ),
       child: DefaultTextStyle(
         style: const TextStyle(
           color: Colors.black,
-          fontFamily: 'Arial',
         ),
         child: Column(
           crossAxisAlignment:
@@ -886,7 +859,7 @@ class _ReportScreenState extends State<ReportScreen> {
               'সহজ হিসাব',
               textAlign: TextAlign.center,
               style: TextStyle(
-                fontSize: 27,
+                fontSize: 28,
                 fontWeight: FontWeight.w900,
               ),
             ),
@@ -894,11 +867,13 @@ class _ReportScreenState extends State<ReportScreen> {
             const SizedBox(height: 5),
 
             Text(
-              reportTitle,
+              isIncome
+                  ? 'খাতভিত্তিক আয় রিপোর্ট'
+                  : 'খাতভিত্তিক ব্যয় রিপোর্ট',
               textAlign: TextAlign.center,
               style: const TextStyle(
                 fontSize: 18,
-                fontWeight: FontWeight.w700,
+                fontWeight: FontWeight.w800,
               ),
             ),
 
@@ -910,27 +885,19 @@ class _ReportScreenState extends State<ReportScreen> {
               ),
               textAlign: TextAlign.center,
               style: const TextStyle(
-                fontSize: 15,
+                fontSize: 14,
                 fontWeight: FontWeight.w600,
               ),
             ),
 
-            const SizedBox(height: 4),
-
-            Text(
-              periodText,
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                fontSize: 11,
-                color: Colors.black54,
-              ),
-            ),
-
-            const SizedBox(height: 22),
+            const SizedBox(height: 18),
 
             Container(
               padding:
-                  const EdgeInsets.all(14),
+                  const EdgeInsets.symmetric(
+                horizontal: 15,
+                vertical: 12,
+              ),
               decoration: BoxDecoration(
                 border: Border.all(
                   color: Colors.black54,
@@ -938,282 +905,34 @@ class _ReportScreenState extends State<ReportScreen> {
                 borderRadius:
                     BorderRadius.circular(8),
               ),
-              child: Column(
+              child: Row(
                 children: [
                   const Text(
-                    'রিপোর্টের ধরন',
+                    'খাত:',
                     style: TextStyle(
-                      fontSize: 11,
-                      color: Colors.black54,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w800,
                     ),
                   ),
 
-                  const SizedBox(height: 3),
+                  const SizedBox(width: 8),
 
-                  Text(
-                    typeTitle,
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight:
-                          FontWeight.w800,
-                    ),
-                  ),
-
-                  const SizedBox(height: 9),
-
-                  const Text(
-                    'খাত',
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: Colors.black54,
-                    ),
-                  ),
-
-                  const SizedBox(height: 3),
-
-                  Text(
-                    category,
-                    textAlign:
-                        TextAlign.center,
-                    style: const TextStyle(
-                      fontSize: 19,
-                      fontWeight:
-                          FontWeight.w900,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-
-            const SizedBox(height: 18),
-
-            // ==================================================
-            // TABLE HEADER
-            // ==================================================
-
-            Container(
-              padding:
-                  const EdgeInsets.symmetric(
-                horizontal: 10,
-                vertical: 11,
-              ),
-              color: const Color(0xFFEFEFEF),
-              child: Row(
-                children: const [
-                  SizedBox(
-                    width: 45,
-                    child: Text(
-                      'নং',
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight:
-                            FontWeight.w900,
-                      ),
-                    ),
-                  ),
-                  SizedBox(
-                    width: 95,
-                    child: Text(
-                      'তারিখ',
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight:
-                            FontWeight.w900,
-                      ),
-                    ),
-                  ),
                   Expanded(
                     child: Text(
-                      'বিবরণ',
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight:
-                            FontWeight.w900,
+                      _selectedCategory ??
+                          'কোনো খাত নেই',
+                      style: const TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w900,
                       ),
                     ),
                   ),
-                  SizedBox(
-                    width: 120,
-                    child: Text(
-                      'পরিমাণ',
-                      textAlign:
-                          TextAlign.right,
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight:
-                            FontWeight.w900,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
 
-            if (transactions.isEmpty)
-              Container(
-                padding:
-                    const EdgeInsets.all(30),
-                decoration:
-                    const BoxDecoration(
-                  border: Border(
-                    left: BorderSide(
-                      color: Colors.black12,
-                    ),
-                    right: BorderSide(
-                      color: Colors.black12,
-                    ),
-                    bottom: BorderSide(
-                      color: Colors.black12,
-                    ),
-                  ),
-                ),
-                child: const Text(
-                  'এই খাতে কোনো লেনদেন পাওয়া যায়নি',
-                  textAlign:
-                      TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 13,
-                  ),
-                ),
-              ),
-
-            ...transactions
-                .asMap()
-                .entries
-                .map(
-              (entry) {
-                final index = entry.key;
-                final item = entry.value;
-
-                final description =
-                    item.note?.trim() ?? '';
-
-                return Container(
-                  padding:
-                      const EdgeInsets.symmetric(
-                    horizontal: 10,
-                    vertical: 10,
-                  ),
-                  decoration:
-                      const BoxDecoration(
-                    border: Border(
-                      left: BorderSide(
-                        color: Colors.black12,
-                      ),
-                      right: BorderSide(
-                        color: Colors.black12,
-                      ),
-                      bottom: BorderSide(
-                        color: Colors.black12,
-                      ),
-                    ),
-                  ),
-                  child: Row(
-                    crossAxisAlignment:
-                        CrossAxisAlignment.start,
-                    children: [
-                      SizedBox(
-                        width: 45,
-                        child: Text(
-                          '${index + 1}',
-                          style:
-                              const TextStyle(
-                            fontSize: 11,
-                            fontWeight:
-                                FontWeight.w700,
-                          ),
-                        ),
-                      ),
-
-                      SizedBox(
-                        width: 95,
-                        child: Text(
-                          _displayDate(
-                            item.date,
-                          ),
-                          style:
-                              const TextStyle(
-                            fontSize: 11,
-                          ),
-                        ),
-                      ),
-
-                      Expanded(
-                        child: Text(
-                          description.isEmpty
-                              ? '—'
-                              : description,
-                          style:
-                              const TextStyle(
-                            fontSize: 11,
-                            fontWeight:
-                                FontWeight.w600,
-                          ),
-                        ),
-                      ),
-
-                      SizedBox(
-                        width: 120,
-                        child: Text(
-                          _money(item.amount),
-                          textAlign:
-                              TextAlign.right,
-                          style:
-                              const TextStyle(
-                            fontSize: 11,
-                            fontWeight:
-                                FontWeight.w800,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                );
-              },
-            ),
-
-            const SizedBox(height: 12),
-
-            // ==================================================
-            // TOTAL
-            // ==================================================
-
-            Container(
-              padding:
-                  const EdgeInsets.symmetric(
-                horizontal: 14,
-                vertical: 15,
-              ),
-              decoration: BoxDecoration(
-                border: Border.all(
-                  color: isIncome
-                      ? Colors.green.shade700
-                      : Colors.red.shade700,
-                  width: 1.2,
-                ),
-                borderRadius:
-                    BorderRadius.circular(8),
-              ),
-              child: Row(
-                children: [
-                  const Expanded(
-                    child: Text(
-                      'মোট',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight:
-                            FontWeight.w900,
-                      ),
-                    ),
-                  ),
                   Text(
-                    _money(
-                      _categoryReportTotal,
-                    ),
+                    isIncome ? 'আয়' : 'ব্যয়',
                     style: TextStyle(
-                      fontSize: 18,
-                      fontWeight:
-                          FontWeight.w900,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w800,
                       color: isIncome
                           ? Colors.green.shade800
                           : Colors.red.shade800,
@@ -1223,45 +942,176 @@ class _ReportScreenState extends State<ReportScreen> {
               ),
             ),
 
-            const SizedBox(height: 10),
+            const SizedBox(height: 16),
 
-            Text(
-              'মোট লেনদেন: ${transactions.length} টি',
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                fontSize: 12,
-                fontWeight:
-                    FontWeight.w600,
+            if (transactions.isEmpty)
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(
+                  vertical: 45,
+                ),
+                decoration: BoxDecoration(
+                  border: Border.all(
+                    color: Colors.black26,
+                  ),
+                  borderRadius:
+                      BorderRadius.circular(8),
+                ),
+                child: const Column(
+                  children: [
+                    Icon(
+                      Icons.receipt_long_outlined,
+                      size: 45,
+                      color: Colors.black45,
+                    ),
+                    SizedBox(height: 10),
+                    Text(
+                      'এই খাতে কোনো Transaction নেই',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                ),
+              )
+            else
+              Container(
+                decoration: BoxDecoration(
+                  border: Border.all(
+                    color: Colors.black54,
+                  ),
+                  borderRadius:
+                      BorderRadius.circular(8),
+                ),
+                child: Column(
+                  children: [
+                    _buildCategoryTableHeader(),
+
+                    ...transactions
+                        .asMap()
+                        .entries
+                        .map(
+                      (entry) {
+                        final index = entry.key;
+                        final item = entry.value;
+
+                        return _buildCategoryTableRow(
+                          index + 1,
+                          item,
+                        );
+                      },
+                    ),
+
+                    Container(
+                      padding:
+                          const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 13,
+                      ),
+                      color: const Color(
+                        0xFFF2F2F2,
+                      ),
+                      child: Row(
+                        children: [
+                          const Expanded(
+                            child: Text(
+                              'এই পৃষ্ঠার মোট',
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight:
+                                    FontWeight.w900,
+                              ),
+                            ),
+                          ),
+                          Text(
+                            _money(pageTotal),
+                            style:
+                                const TextStyle(
+                              fontSize: 14,
+                              fontWeight:
+                                  FontWeight.w900,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+            const SizedBox(height: 14),
+
+            Container(
+              padding:
+                  const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                border: Border.all(
+                  color: Colors.black26,
+                ),
+                borderRadius:
+                    BorderRadius.circular(8),
+              ),
+              child: Row(
+                children: [
+                  const Expanded(
+                    child: Text(
+                      'সব পৃষ্ঠার মোট',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                  ),
+                  Text(
+                    _money(_categoryGrandTotal),
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ],
               ),
             ),
 
-            const SizedBox(height: 22),
+            const SizedBox(height: 15),
 
-            // ==================================================
-            // WATERMARK
-            // ==================================================
+            Row(
+              mainAxisAlignment:
+                  MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'মোট Transaction: '
+                  '${_categoryTransactions.length} টি',
+                  style: const TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+
+                Text(
+                  'পৃষ্ঠা ${pageIndex + 1} / $totalPages',
+                  style: const TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ],
+            ),
+
+            const SizedBox(height: 18),
 
             Align(
               alignment: Alignment.bottomRight,
               child: Opacity(
-                opacity: 0.38,
-                child: SizedBox(
-                  width: 190,
-                  child: Column(
-                    crossAxisAlignment:
-                        CrossAxisAlignment.center,
-                    children: const [
-                      Text(
-                        'সহজ হিসাব অ্যাপ',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          color: Color(0xFF777777),
-                          fontSize: 10,
-                          fontWeight:
-                              FontWeight.w600,
-                        ),
-                      ),
-                    ],
+                opacity: 0.35,
+                child: const Text(
+                  'সহজ হিসাব',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: Color(0xFF777777),
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700,
                   ),
                 ),
               ),
@@ -1272,11 +1122,190 @@ class _ReportScreenState extends State<ReportScreen> {
     );
   }
 
+  Widget _buildCategoryTableHeader() {
+    return Container(
+      padding:
+          const EdgeInsets.symmetric(
+        horizontal: 8,
+        vertical: 11,
+      ),
+      color: const Color(0xFFEFEFEF),
+      child: Row(
+        children: [
+          SizedBox(
+            width: 38,
+            child: const Text(
+              'নং',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+          ),
+
+          SizedBox(
+            width: 95,
+            child: const Text(
+              'তারিখ',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+          ),
+
+          Expanded(
+            flex: 2,
+            child: const Text(
+              'বিবরণ / নোট',
+              textAlign: TextAlign.left,
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+          ),
+
+          Expanded(
+            flex: 1,
+            child: const Text(
+              'অ্যাকাউন্ট',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+          ),
+
+          SizedBox(
+            width: 105,
+            child: const Text(
+              'পরিমাণ',
+              textAlign: TextAlign.right,
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCategoryTableRow(
+    int number,
+    MoneyTransaction item,
+  ) {
+    final note = item.note?.trim() ?? '';
+
+    return Container(
+      padding:
+          const EdgeInsets.symmetric(
+        horizontal: 8,
+        vertical: 11,
+      ),
+      decoration:
+          const BoxDecoration(
+        border: Border(
+          top: BorderSide(
+            color: Colors.black12,
+          ),
+        ),
+      ),
+      child: Row(
+        crossAxisAlignment:
+            CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 38,
+            child: Text(
+              '$number',
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                fontSize: 10,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+
+          SizedBox(
+            width: 95,
+            child: Text(
+              _displayDate(item.date),
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                fontSize: 10,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+
+          Expanded(
+            flex: 2,
+            child: Padding(
+              padding:
+                  const EdgeInsets.symmetric(
+                horizontal: 5,
+              ),
+              child: Text(
+                note.isEmpty ? '—' : note,
+                maxLines: 3,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
+          ),
+
+          Expanded(
+            flex: 1,
+            child: Padding(
+              padding:
+                  const EdgeInsets.symmetric(
+                horizontal: 4,
+              ),
+              child: Text(
+                item.account,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ),
+
+          SizedBox(
+            width: 105,
+            child: Text(
+              _money(item.amount),
+              textAlign: TextAlign.right,
+              style: const TextStyle(
+                fontSize: 10.5,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   // ============================================================
-  // CAPTURE MONTHLY A4 IMAGE
+  // SCREENSHOT
   // ============================================================
 
-  Future<Uint8List> _captureA4Image() async {
+  Future<Uint8List> _captureWidget(
+    Widget widget,
+  ) async {
     final image =
         await _screenshotController
             .captureFromLongWidget(
@@ -1284,7 +1313,7 @@ class _ReportScreenState extends State<ReportScreen> {
         context,
         Material(
           color: Colors.white,
-          child: _buildA4Report(),
+          child: widget,
         ),
       ),
       delay:
@@ -1300,37 +1329,34 @@ class _ReportScreenState extends State<ReportScreen> {
     return image;
   }
 
-  // ============================================================
-  // CAPTURE CATEGORY IMAGE
-  // ============================================================
+  Future<Uint8List> _captureMonthlyImage() async {
+    return await _captureWidget(
+      _buildA4Report(),
+    );
+  }
 
-  Future<Uint8List>
-      _captureCategoryImage() async {
-    final image =
-        await _categoryScreenshotController
-            .captureFromLongWidget(
-      InheritedTheme.captureAll(
-        context,
-        Material(
-          color: Colors.white,
-          child: _buildCategoryA4Report(),
-        ),
-      ),
-      delay:
-          const Duration(milliseconds: 500),
-      context: context,
-      pixelRatio: 2,
-      constraints:
-          const BoxConstraints(
-        maxWidth: 794,
+  Future<Uint8List> _captureCategoryPageImage(
+    int page,
+  ) async {
+    final transactions =
+        _categoryTransactions
+            .skip(
+              page * _transactionsPerPage,
+            )
+            .take(_transactionsPerPage)
+            .toList();
+
+    return await _captureWidget(
+      _buildCategoryVoucher(
+        transactions: transactions,
+        pageIndex: page,
+        totalPages: _categoryPageCount,
       ),
     );
-
-    return image;
   }
 
   // ============================================================
-  // SAVE MONTHLY IMAGE
+  // SAVE IMAGE
   // ============================================================
 
   Future<void> _saveAsImage() async {
@@ -1341,9 +1367,6 @@ class _ReportScreenState extends State<ReportScreen> {
     });
 
     try {
-      final Uint8List image =
-          await _captureA4Image();
-
       final permission =
           await Gal.requestAccess(
         toAlbum: true,
@@ -1360,20 +1383,59 @@ class _ReportScreenState extends State<ReportScreen> {
         _selectedMonth,
       );
 
-      await Gal.putImageBytes(
-        image,
-        album: 'সহজ হিসাব',
-        name:
-            'Shohoj_Hisab_Report_$month',
-      );
+      if (_reportMode == _ReportMode.monthly) {
+        final image =
+            await _captureMonthlyImage();
+
+        await Gal.putImageBytes(
+          image,
+          album: 'সহজ হিসাব',
+          name:
+              'Shohoj_Hisab_Report_$month',
+        );
+      } else {
+        if (_categoryTransactions.isEmpty) {
+          throw Exception(
+            'এই খাতে কোনো Transaction নেই',
+          );
+        }
+
+        final totalPages =
+            _categoryPageCount;
+
+        final category =
+            _safeFileName(
+          _selectedCategory ?? 'Category',
+        );
+
+        for (int page = 0;
+            page < totalPages;
+            page++) {
+          final image =
+              await _captureCategoryPageImage(
+            page,
+          );
+
+          await Gal.putImageBytes(
+            image,
+            album: 'সহজ হিসাব',
+            name:
+                'Shohoj_Hisab_${_categoryType}_'
+                '$category_$month'
+                '_Page_${page + 1}',
+          );
+        }
+      }
 
       if (!mounted) return;
 
       ScaffoldMessenger.of(context)
           .showSnackBar(
-        const SnackBar(
+        SnackBar(
           content: Text(
-            'মাসিক রিপোর্টটি Gallery-তে Save হয়েছে',
+            _reportMode == _ReportMode.monthly
+                ? 'রিপোর্টটি Gallery-তে Save হয়েছে'
+                : '${_categoryPageCount}টি Page Gallery-তে Save হয়েছে',
           ),
         ),
       );
@@ -1398,7 +1460,7 @@ class _ReportScreenState extends State<ReportScreen> {
   }
 
   // ============================================================
-  // SAVE MONTHLY PDF
+  // SAVE PDF
   // ============================================================
 
   Future<void> _saveAsPdf() async {
@@ -1409,45 +1471,95 @@ class _ReportScreenState extends State<ReportScreen> {
     });
 
     try {
-      final Uint8List image =
-          await _captureA4Image();
-
       final pdf = pw.Document();
-
-      final pdfImage =
-          pw.MemoryImage(image);
-
-      pdf.addPage(
-        pw.Page(
-          pageFormat: PdfPageFormat.a4,
-          margin: pw.EdgeInsets.zero,
-          build: (context) {
-            return pw.Image(
-              pdfImage,
-              fit: pw.BoxFit.contain,
-            );
-          },
-        ),
-      );
 
       final month =
           DateFormat('MM-yyyy').format(
         _selectedMonth,
       );
 
-      await Printing.sharePdf(
-        bytes: await pdf.save(),
-        filename:
-            'Shohoj_Hisab_Report_$month.pdf',
-      );
+      if (_reportMode == _ReportMode.monthly) {
+        final image =
+            await _captureMonthlyImage();
+
+        final pdfImage =
+            pw.MemoryImage(image);
+
+        pdf.addPage(
+          pw.Page(
+            pageFormat: PdfPageFormat.a4,
+            margin: pw.EdgeInsets.zero,
+            build: (context) {
+              return pw.Image(
+                pdfImage,
+                fit: pw.BoxFit.contain,
+              );
+            },
+          ),
+        );
+
+        await Printing.sharePdf(
+          bytes: await pdf.save(),
+          filename:
+              'Shohoj_Hisab_Report_$month.pdf',
+        );
+      } else {
+        if (_categoryTransactions.isEmpty) {
+          throw Exception(
+            'এই খাতে কোনো Transaction নেই',
+          );
+        }
+
+        final totalPages =
+            _categoryPageCount;
+
+        final category =
+            _safeFileName(
+          _selectedCategory ?? 'Category',
+        );
+
+        for (int page = 0;
+            page < totalPages;
+            page++) {
+          final image =
+              await _captureCategoryPageImage(
+            page,
+          );
+
+          final pdfImage =
+              pw.MemoryImage(image);
+
+          pdf.addPage(
+            pw.Page(
+              pageFormat: PdfPageFormat.a4,
+              margin: pw.EdgeInsets.zero,
+              build: (context) {
+                return pw.Image(
+                  pdfImage,
+                  fit: pw.BoxFit.contain,
+                );
+              },
+            ),
+          );
+        }
+
+        await Printing.sharePdf(
+          bytes: await pdf.save(),
+          filename:
+              'Shohoj_Hisab_${_categoryType}_'
+              '${category}_$month.pdf',
+        );
+      }
 
       if (!mounted) return;
 
       ScaffoldMessenger.of(context)
           .showSnackBar(
-        const SnackBar(
+        SnackBar(
           content: Text(
-            'A4 PDF তৈরি হয়েছে',
+            _reportMode == _ReportMode.monthly
+                ? 'A4 PDF তৈরি হয়েছে'
+                : '${_categoryPageCount} পৃষ্ঠার PDF তৈরি হয়েছে',
           ),
         ),
       );
@@ -1472,851 +1584,6 @@ class _ReportScreenState extends State<ReportScreen> {
   }
 
   // ============================================================
-  // SAVE CATEGORY REPORT IMAGE
-  // ============================================================
-
-  Future<void>
-      _saveCategoryReportImage() async {
-    if (_savingCategoryImage) return;
-
-    if (_selectedCategory == null) {
-      ScaffoldMessenger.of(context)
-          .showSnackBar(
-        const SnackBar(
-          content: Text(
-            'প্রথমে একটি খাত নির্বাচন করুন',
-          ),
-        ),
-      );
-      return;
-    }
-
-    setState(() {
-      _savingCategoryImage = true;
-    });
-
-    try {
-      final Uint8List image =
-          await _captureCategoryImage();
-
-      final permission =
-          await Gal.requestAccess(
-        toAlbum: true,
-      );
-
-      if (!permission) {
-        throw Exception(
-          'Gallery permission পাওয়া যায়নি',
-        );
-      }
-
-      final month =
-          DateFormat('MM-yyyy').format(
-        _selectedMonth,
-      );
-
-      final type =
-          _categoryReportType == 'Income'
-              ? 'Income'
-              : 'Expense';
-
-      final safeCategory =
-          _selectedCategory!
-              .replaceAll(
-                RegExp(r'[\\/:*?"<>|]'),
-                '_',
-              )
-              .replaceAll(' ', '_');
-
-      await Gal.putImageBytes(
-        image,
-        album: 'সহজ হিসাব',
-        name:
-            'Shohoj_Hisab_${type}_${safeCategory}_$month',
-      );
-
-      if (!mounted) return;
-
-      ScaffoldMessenger.of(context)
-          .showSnackBar(
-        const SnackBar(
-          content: Text(
-            'খাতভিত্তিক রিপোর্টটি Gallery-তে Save হয়েছে',
-          ),
-        ),
-      );
-    } catch (e) {
-      if (!mounted) return;
-
-      ScaffoldMessenger.of(context)
-          .showSnackBar(
-        SnackBar(
-          content: Text(
-            'রিপোর্ট Save করা যায়নি\n$e',
-          ),
-        ),
-      );
-    } finally {
-      if (mounted) {
-        setState(() {
-          _savingCategoryImage = false;
-        });
-      }
-    }
-  }
-
-  // ============================================================
-  // MAIN UI
-  // ============================================================
-
-  @override
-  Widget build(BuildContext context) {
-    final dark = AppTheme.isDark;
-
-    return Scaffold(
-      backgroundColor:
-          AppTheme.background,
-
-      appBar: AppBar(
-        title: Text(
-          'রিপোর্ট',
-          style: TextStyle(
-            color: dark
-                ? AppTheme.gold
-                : AppTheme.darkGreen,
-            fontWeight: FontWeight.w800,
-          ),
-        ),
-        actions: [
-          IconButton(
-            tooltip: 'Refresh',
-            onPressed: _loadReport,
-            icon: Icon(
-              Icons.refresh_rounded,
-              color: dark
-                  ? AppTheme.gold
-                  : AppTheme.darkGreen,
-            ),
-          ),
-        ],
-      ),
-
-      body: _loading
-          ? Center(
-              child:
-                  CircularProgressIndicator(
-                color: dark
-                    ? AppTheme.gold
-                    : AppTheme.darkGreen,
-              ),
-            )
-          : RefreshIndicator(
-              onRefresh: _loadReport,
-              color: dark
-                  ? AppTheme.gold
-                  : AppTheme.darkGreen,
-              child:
-                  SingleChildScrollView(
-                physics:
-                    const AlwaysScrollableScrollPhysics(),
-                padding:
-                    const EdgeInsets.fromLTRB(
-                  14,
-                  10,
-                  14,
-                  20,
-                ),
-                child: Column(
-                  children: [
-                    // ==================================================
-                    // REPORT TYPE SWITCH
-                    // ==================================================
-
-                    _buildReportTypeSelector(
-                      dark,
-                    ),
-
-                    const SizedBox(height: 16),
-
-                    // ==================================================
-                    // MONTHLY REPORT
-                    // ==================================================
-
-                    if (_selectedReportMode ==
-                        'monthly')
-                      _buildMonthlyReportSection(
-                        dark,
-                      ),
-
-                    // ==================================================
-                    // CATEGORY REPORT
-                    // ==================================================
-
-                    if (_selectedReportMode ==
-                        'category')
-                      _buildCategoryReportSection(
-                        dark,
-                      ),
-                  ],
-                ),
-              ),
-            ),
-    );
-  }
-
-  // ============================================================
-  // REPORT MODE
-  // ============================================================
-
-  String _selectedReportMode = 'monthly';
-
-  // ============================================================
-  // REPORT TYPE SELECTOR
-  // ============================================================
-
-  Widget _buildReportTypeSelector(
-    bool dark,
-  ) {
-    return Container(
-      padding: const EdgeInsets.all(5),
-      decoration: BoxDecoration(
-        color: AppTheme.cardColor,
-        borderRadius:
-            BorderRadius.circular(16),
-        border: Border.all(
-          color: AppTheme.gold.withValues(
-            alpha: dark ? 0.35 : 0.25,
-          ),
-        ),
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: _buildReportModeButton(
-              title: 'মাসিক রিপোর্ট',
-              icon: Icons
-                  .calendar_month_rounded,
-              selected:
-                  _selectedReportMode ==
-                      'monthly',
-              dark: dark,
-              onTap: () {
-                setState(() {
-                  _selectedReportMode =
-                      'monthly';
-                });
-              },
-            ),
-          ),
-
-          const SizedBox(width: 5),
-
-          Expanded(
-            child: _buildReportModeButton(
-              title: 'খাতভিত্তিক রিপোর্ট',
-              icon: Icons
-                  .category_rounded,
-              selected:
-                  _selectedReportMode ==
-                      'category',
-              dark: dark,
-              onTap: () {
-                setState(() {
-                  _selectedReportMode =
-                      'category';
-
-                  _updateSelectedCategory();
-                });
-              },
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // ============================================================
-  // REPORT MODE BUTTON
-  // ============================================================
-
-  Widget _buildReportModeButton({
-    required String title,
-    required IconData icon,
-    required bool selected,
-    required bool dark,
-    required VoidCallback onTap,
-  }) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius:
-          BorderRadius.circular(12),
-      child: AnimatedContainer(
-        duration:
-            const Duration(milliseconds: 200),
-        padding:
-            const EdgeInsets.symmetric(
-          vertical: 12,
-          horizontal: 8,
-        ),
-        decoration: BoxDecoration(
-          color: selected
-              ? (dark
-                  ? AppTheme.gold
-                  : AppTheme.darkGreen)
-              : Colors.transparent,
-          borderRadius:
-              BorderRadius.circular(12),
-        ),
-        child: Row(
-          mainAxisAlignment:
-              MainAxisAlignment.center,
-          children: [
-            Icon(
-              icon,
-              size: 19,
-              color: selected
-                  ? (dark
-                      ? Colors.black
-                      : Colors.white)
-                  : AppTheme.textMuted,
-            ),
-
-            const SizedBox(width: 6),
-
-            Flexible(
-              child: Text(
-                title,
-                textAlign:
-                    TextAlign.center,
-                style: TextStyle(
-                  color: selected
-                      ? (dark
-                          ? Colors.black
-                          : Colors.white)
-                      : AppTheme.textPrimary,
-                  fontSize: 12,
-                  fontWeight:
-                      FontWeight.w800,
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  // ============================================================
-  // MONTHLY REPORT SECTION
-  // ============================================================
-
-  Widget _buildMonthlyReportSection(
-    bool dark,
-  ) {
-    return Column(
-      children: [
-        _buildMonthSelector(
-          Theme.of(context),
-          dark,
-        ),
-
-        const SizedBox(height: 16),
-
-        Container(
-          width: double.infinity,
-          padding:
-              const EdgeInsets.all(8),
-          decoration: BoxDecoration(
-            color: Colors.grey.shade200,
-            borderRadius:
-                BorderRadius.circular(12),
-          ),
-          child: FittedBox(
-            fit: BoxFit.fitWidth,
-            alignment:
-                Alignment.topCenter,
-            child: Screenshot(
-              controller:
-                  _screenshotController,
-              child: _buildA4Report(),
-            ),
-          ),
-        ),
-
-        const SizedBox(height: 18),
-
-        Row(
-          children: [
-            Expanded(
-              child: ElevatedButton.icon(
-                onPressed:
-                    _savingImage
-                        ? null
-                        : _saveAsImage,
-                icon: _savingImage
-                    ? const SizedBox(
-                        width: 18,
-                        height: 18,
-                        child:
-                            CircularProgressIndicator(
-                          strokeWidth: 2,
-                        ),
-                      )
-                    : const Icon(
-                        Icons.image_outlined,
-                      ),
-                label: const Text(
-                  'Save as Image',
-                ),
-                style:
-                    ElevatedButton.styleFrom(
-                  padding:
-                      const EdgeInsets
-                          .symmetric(
-                    vertical: 15,
-                  ),
-                  backgroundColor: dark
-                      ? AppTheme.gold
-                      : AppTheme.darkGreen,
-                  foregroundColor: dark
-                      ? Colors.black
-                      : Colors.white,
-                  shape:
-                      RoundedRectangleBorder(
-                    borderRadius:
-                        BorderRadius.circular(
-                      14,
-                    ),
-                  ),
-                ),
-              ),
-            ),
-
-            const SizedBox(width: 10),
-
-            Expanded(
-              child: ElevatedButton.icon(
-                onPressed:
-                    _savingPdf
-                        ? null
-                        : _saveAsPdf,
-                icon: _savingPdf
-                    ? const SizedBox(
-                        width: 18,
-                        height: 18,
-                        child:
-                            CircularProgressIndicator(
-                          strokeWidth: 2,
-                        ),
-                      )
-                    : const Icon(
-                        Icons
-                            .picture_as_pdf_outlined,
-                      ),
-                label: const Text(
-                  'Save as PDF',
-                ),
-                style:
-                    ElevatedButton.styleFrom(
-                  padding:
-                      const EdgeInsets
-                          .symmetric(
-                    vertical: 15,
-                  ),
-                  backgroundColor:
-                      Colors.redAccent,
-                  foregroundColor:
-                      Colors.white,
-                  shape:
-                      RoundedRectangleBorder(
-                    borderRadius:
-                        BorderRadius.circular(
-                      14,
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ),
-
-        const SizedBox(height: 6),
-
-        Text(
-          'Image: A4 • Gallery-তে Save হবে',
-          style: TextStyle(
-            color: AppTheme.textMuted,
-            fontSize: 11,
-          ),
-        ),
-      ],
-    );
-  }
-
-  // ============================================================
-  // CATEGORY REPORT SECTION
-  // ============================================================
-
-  Widget _buildCategoryReportSection(
-    bool dark,
-  ) {
-    final categories =
-        _availableCategories;
-
-    return Column(
-      children: [
-        // ========================================================
-        // MONTH SELECTOR
-        // ========================================================
-
-        _buildMonthSelector(
-          Theme.of(context),
-          dark,
-        ),
-
-        const SizedBox(height: 14),
-
-        // ========================================================
-        // INCOME / EXPENSE
-        // ========================================================
-
-        Container(
-          padding: const EdgeInsets.all(5),
-          decoration: BoxDecoration(
-            color: AppTheme.cardColor,
-            borderRadius:
-                BorderRadius.circular(16),
-            border: Border.all(
-              color:
-                  AppTheme.gold.withValues(
-                alpha: dark ? 0.35 : 0.25,
-              ),
-            ),
-          ),
-          child: Row(
-            children: [
-              Expanded(
-                child:
-                    _buildIncomeExpenseButton(
-                  title: 'আয়',
-                  icon: Icons
-                      .arrow_downward_rounded,
-                  selected:
-                      _categoryReportType ==
-                          'Income',
-                  dark: dark,
-                  onTap: () {
-                    setState(() {
-                      _categoryReportType =
-                          'Income';
-
-                      _updateSelectedCategory();
-                    });
-                  },
-                ),
-              ),
-
-              const SizedBox(width: 5),
-
-              Expanded(
-                child:
-                    _buildIncomeExpenseButton(
-                  title: 'ব্যয়',
-                  icon: Icons
-                      .arrow_upward_rounded,
-                  selected:
-                      _categoryReportType ==
-                          'Expense',
-                  dark: dark,
-                  onTap: () {
-                    setState(() {
-                      _categoryReportType =
-                          'Expense';
-
-                      _updateSelectedCategory();
-                    });
-                  },
-                ),
-              ),
-            ],
-          ),
-        ),
-
-        const SizedBox(height: 14),
-
-        // ========================================================
-        // CATEGORY DROPDOWN
-        // ========================================================
-
-        Container(
-          width: double.infinity,
-          padding:
-              const EdgeInsets.symmetric(
-            horizontal: 14,
-            vertical: 4,
-          ),
-          decoration: BoxDecoration(
-            color: AppTheme.cardColor,
-            borderRadius:
-                BorderRadius.circular(16),
-            border: Border.all(
-              color:
-                  AppTheme.gold.withValues(
-                alpha: dark ? 0.35 : 0.25,
-              ),
-            ),
-          ),
-          child: categories.isEmpty
-              ? Padding(
-                  padding:
-                      const EdgeInsets
-                          .symmetric(
-                    vertical: 17,
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(
-                        Icons
-                            .category_outlined,
-                        color:
-                            AppTheme.textMuted,
-                      ),
-                      const SizedBox(
-                        width: 10,
-                      ),
-                      Expanded(
-                        child: Text(
-                          _categoryReportType ==
-                                  'Income'
-                              ? 'এই মাসে কোনো আয়ের খাত নেই'
-                              : 'এই মাসে কোনো ব্যয়ের খাত নেই',
-                          style: TextStyle(
-                            color:
-                                AppTheme.textMuted,
-                            fontSize: 13,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                )
-              : DropdownButtonHideUnderline(
-                  child:
-                      DropdownButton<String>(
-                    value:
-                        categories.contains(
-                      _selectedCategory,
-                    )
-                            ? _selectedCategory
-                            : categories
-                                .first,
-                    isExpanded: true,
-                    dropdownColor:
-                        AppTheme.cardColor,
-                    icon: Icon(
-                      Icons
-                          .keyboard_arrow_down_rounded,
-                      color: dark
-                          ? AppTheme.gold
-                          : AppTheme.darkGreen,
-                    ),
-                    style: TextStyle(
-                      color:
-                          AppTheme.textPrimary,
-                      fontSize: 14,
-                      fontWeight:
-                          FontWeight.w700,
-                    ),
-                    items: categories
-                        .map(
-                          (category) =>
-                              DropdownMenuItem<
-                                  String>(
-                            value: category,
-                            child: Text(
-                              category,
-                            ),
-                          ),
-                        )
-                        .toList(),
-                    onChanged: (value) {
-                      if (value == null) {
-                        return;
-                      }
-
-                      setState(() {
-                        _selectedCategory =
-                            value;
-                      });
-                    },
-                  ),
-                ),
-        ),
-
-        const SizedBox(height: 16),
-
-        // ========================================================
-        // CATEGORY REPORT PREVIEW
-        // ========================================================
-
-        if (_selectedCategory != null)
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: Colors.grey.shade200,
-              borderRadius:
-                  BorderRadius.circular(12),
-            ),
-            child: FittedBox(
-              fit: BoxFit.fitWidth,
-              alignment:
-                  Alignment.topCenter,
-              child: Screenshot(
-                controller:
-                    _categoryScreenshotController,
-                child:
-                    _buildCategoryA4Report(),
-              ),
-            ),
-          ),
-
-        const SizedBox(height: 18),
-
-        // ========================================================
-        // SAVE BUTTON
-        // ========================================================
-
-        SizedBox(
-          width: double.infinity,
-          child: ElevatedButton.icon(
-            onPressed:
-                (_selectedCategory == null ||
-                        _savingCategoryImage)
-                    ? null
-                    : _saveCategoryReportImage,
-            icon: _savingCategoryImage
-                ? const SizedBox(
-                    width: 19,
-                    height: 19,
-                    child:
-                        CircularProgressIndicator(
-                      strokeWidth: 2,
-                    ),
-                  )
-                : const Icon(
-                    Icons
-                        .save_alt_rounded,
-                  ),
-            label: const Text(
-              'Gallery-তে রিপোর্ট Save করুন',
-            ),
-            style:
-                ElevatedButton.styleFrom(
-              padding:
-                  const EdgeInsets.symmetric(
-                vertical: 15,
-              ),
-              backgroundColor: dark
-                  ? AppTheme.gold
-                  : AppTheme.darkGreen,
-              foregroundColor: dark
-                  ? Colors.black
-                  : Colors.white,
-              disabledBackgroundColor:
-                  Colors.grey.shade400,
-              disabledForegroundColor:
-                  Colors.white,
-              shape:
-                  RoundedRectangleBorder(
-                borderRadius:
-                    BorderRadius.circular(14),
-              ),
-            ),
-          ),
-        ),
-
-        const SizedBox(height: 6),
-
-        Text(
-          'নির্বাচিত মাসের ১ তারিখ থেকে আজ পর্যন্ত লেনদেন দেখাবে',
-          textAlign: TextAlign.center,
-          style: TextStyle(
-            color: AppTheme.textMuted,
-            fontSize: 11,
-          ),
-        ),
-      ],
-    );
-  }
-
-  // ============================================================
-  // INCOME / EXPENSE BUTTON
-  // ============================================================
-
-  Widget _buildIncomeExpenseButton({
-    required String title,
-    required IconData icon,
-    required bool selected,
-    required bool dark,
-    required VoidCallback onTap,
-  }) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius:
-          BorderRadius.circular(12),
-      child: AnimatedContainer(
-        duration:
-            const Duration(milliseconds: 200),
-        padding:
-            const EdgeInsets.symmetric(
-          vertical: 12,
-        ),
-        decoration: BoxDecoration(
-          color: selected
-              ? (dark
-                  ? AppTheme.gold
-                  : AppTheme.darkGreen)
-              : Colors.transparent,
-          borderRadius:
-              BorderRadius.circular(12),
-        ),
-        child: Row(
-          mainAxisAlignment:
-              MainAxisAlignment.center,
-          children: [
-            Icon(
-              icon,
-              size: 18,
-              color: selected
-                  ? (dark
-                      ? Colors.black
-                      : Colors.white)
-                  : AppTheme.textMuted,
-            ),
-
-            const SizedBox(width: 6),
-
-            Text(
-              title,
-              style: TextStyle(
-                color: selected
-                    ? (dark
-                        ? Colors.black
-                        : Colors.white)
-                    : AppTheme.textPrimary,
-                fontSize: 13,
-                fontWeight:
-                    FontWeight.w800,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  // ============================================================
   // MONTH SELECTOR
   // ============================================================
 
@@ -2330,7 +1597,8 @@ class _ReportScreenState extends State<ReportScreen> {
         horizontal: 6,
         vertical: 8,
       ),
-      decoration: BoxDecoration(
+      decoration:
+          BoxDecoration(
         color: AppTheme.cardColor,
         borderRadius:
             BorderRadius.circular(18),
@@ -2423,6 +1691,805 @@ class _ReportScreenState extends State<ReportScreen> {
           ),
         ],
       ),
+    );
+  }
+
+  // ============================================================
+  // REPORT MODE SELECTOR
+  // ============================================================
+
+  Widget _buildReportModeSelector(
+    bool dark,
+  ) {
+    return Container(
+      padding: const EdgeInsets.all(5),
+      decoration: BoxDecoration(
+        color: AppTheme.cardColor,
+        borderRadius:
+            BorderRadius.circular(16),
+        border: Border.all(
+          color: AppTheme.gold.withValues(
+            alpha: dark ? 0.30 : 0.20,
+          ),
+        ),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: _modeButton(
+              title: 'মাসিক সারাংশ',
+              icon: Icons.analytics_outlined,
+              selected:
+                  _reportMode ==
+                      _ReportMode.monthly,
+              dark: dark,
+              onTap: () {
+                setState(() {
+                  _reportMode =
+                      _ReportMode.monthly;
+                });
+              },
+            ),
+          ),
+
+          const SizedBox(width: 5),
+
+          Expanded(
+            child: _modeButton(
+              title: 'খাতভিত্তিক রিপোর্ট',
+              icon:
+                  Icons.receipt_long_outlined,
+              selected:
+                  _reportMode ==
+                      _ReportMode.category,
+              dark: dark,
+              onTap: () {
+                setState(() {
+                  _reportMode =
+                      _ReportMode.category;
+                  _categoryPage = 0;
+                });
+
+                _prepareCategory();
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _modeButton({
+    required String title,
+    required IconData icon,
+    required bool selected,
+    required bool dark,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius:
+          BorderRadius.circular(12),
+      child: AnimatedContainer(
+        duration:
+            const Duration(milliseconds: 200),
+        padding:
+            const EdgeInsets.symmetric(
+          vertical: 12,
+          horizontal: 8,
+        ),
+        decoration: BoxDecoration(
+          color: selected
+              ? (dark
+                  ? AppTheme.gold
+                  : AppTheme.darkGreen)
+              : Colors.transparent,
+          borderRadius:
+              BorderRadius.circular(12),
+        ),
+        child: Row(
+          mainAxisAlignment:
+              MainAxisAlignment.center,
+          children: [
+            Icon(
+              icon,
+              size: 19,
+              color: selected
+                  ? (dark
+                      ? Colors.black
+                      : Colors.white)
+                  : AppTheme.textMuted,
+            ),
+
+            const SizedBox(width: 6),
+
+            Flexible(
+              child: Text(
+                title,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: selected
+                      ? (dark
+                          ? Colors.black
+                          : Colors.white)
+                      : AppTheme.textPrimary,
+                  fontSize: 12,
+                  fontWeight:
+                      FontWeight.w800,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ============================================================
+  // CATEGORY CONTROLS
+  // ============================================================
+
+  Widget _buildCategoryControls(
+    bool dark,
+  ) {
+    final categories =
+        _availableCategories;
+
+    return Column(
+      children: [
+        Container(
+          padding:
+              const EdgeInsets.all(5),
+          decoration: BoxDecoration(
+            color: AppTheme.cardColor,
+            borderRadius:
+                BorderRadius.circular(15),
+          ),
+          child: Row(
+            children: [
+              Expanded(
+                child: _typeButton(
+                  title: 'আয়',
+                  selected:
+                      _categoryType ==
+                          'Income',
+                  icon:
+                      Icons.arrow_downward_rounded,
+                  dark: dark,
+                  onTap: () {
+                    _changeCategoryType(
+                      'Income',
+                    );
+                  },
+                ),
+              ),
+
+              const SizedBox(width: 5),
+
+              Expanded(
+                child: _typeButton(
+                  title: 'ব্যয়',
+                  selected:
+                      _categoryType ==
+                          'Expense',
+                  icon:
+                      Icons.arrow_upward_rounded,
+                  dark: dark,
+                  onTap: () {
+                    _changeCategoryType(
+                      'Expense',
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        ),
+
+        const SizedBox(height: 12),
+
+        Container(
+          width: double.infinity,
+          padding:
+              const.symmetric(
+            horizontal: 14,
+          ),
+          decoration: BoxDecoration(
+            color: AppTheme.cardColor,
+            borderRadius:
+                BorderRadius.circular(15),
+            border: Border.all(
+              color:
+                  AppTheme.gold.withValues(
+                alpha: dark ? 0.30 : 0.20,
+              ),
+            ),
+          ),
+          child: categories.isEmpty
+              ? Padding(
+                  padding:
+                      const EdgeInsets.symmetric(
+                    vertical: 17,
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.category_outlined,
+                        color:
+                            AppTheme.textMuted,
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          'এই মাসে কোনো খাত পাওয়া যায়নি',
+                          style: TextStyle(
+                            color:
+                                AppTheme.textMuted,
+                            fontSize: 13,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                )
+              : DropdownButtonHideUnderline(
+                  child: DropdownButton<String>(
+                    value: categories.contains(
+                      _selectedCategory,
+                    )
+                        ? _selectedCategory
+                        : categories.first,
+                    isExpanded: true,
+                    icon: Icon(
+                      Icons
+                          .keyboard_arrow_down_rounded,
+                      color: dark
+                          ? AppTheme.gold
+                          : AppTheme.darkGreen,
+                    ),
+                    dropdownColor:
+                        AppTheme.cardColor,
+                    items: categories.map(
+                      (category) {
+                        return DropdownMenuItem<
+                            String>(
+                          value: category,
+                          child: Text(
+                            category,
+                            overflow:
+                                TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color: AppTheme
+                                  .textPrimary,
+                              fontWeight:
+                                  FontWeight.w700,
+                            ),
+                          ),
+                        );
+                      },
+                    ).toList(),
+                    onChanged:
+                        _changeCategory,
+                  ),
+                ),
+        ),
+      ],
+    );
+  }
+
+  Widget _typeButton({
+    required String title,
+    required bool selected,
+    required IconData icon,
+    required bool dark,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius:
+          BorderRadius.circular(11),
+      child: AnimatedContainer(
+        duration:
+            const Duration(milliseconds: 200),
+        padding:
+            const EdgeInsets.symmetric(
+          vertical: 11,
+        ),
+        decoration: BoxDecoration(
+          color: selected
+              ? (title == 'আয়'
+                  ? Colors.green.shade700
+                  : Colors.red.shade700)
+              : Colors.transparent,
+          borderRadius:
+              BorderRadius.circular(11),
+        ),
+        child: Row(
+          mainAxisAlignment:
+              MainAxisAlignment.center,
+          children: [
+            Icon(
+              icon,
+              size: 18,
+              color: selected
+                  ? Colors.white
+                  : AppTheme.textMuted,
+            ),
+
+            const SizedBox(width: 5),
+
+            Text(
+              title,
+              style: TextStyle(
+                color: selected
+                    ? Colors.white
+                    : AppTheme.textPrimary,
+                fontSize: 13,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ============================================================
+  // CATEGORY PAGE NAVIGATION
+  // ============================================================
+
+  Widget _buildPageNavigation(
+    bool dark,
+  ) {
+    if (_categoryTransactions.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    final totalPages =
+        _categoryPageCount;
+
+    return Container(
+      padding:
+          const EdgeInsets.symmetric(
+        horizontal: 8,
+        vertical: 6,
+      ),
+      decoration: BoxDecoration(
+        color: AppTheme.cardColor,
+        borderRadius:
+            BorderRadius.circular(16),
+        border: Border.all(
+          color:
+              AppTheme.gold.withValues(
+            alpha: dark ? 0.30 : 0.20,
+          ),
+        ),
+      ),
+      child: Row(
+        children: [
+          IconButton(
+            onPressed: _categoryPage > 0
+                ? () {
+                    setState(() {
+                      _categoryPage--;
+                    });
+                  }
+                : null,
+            icon: const Icon(
+              Icons.chevron_left_rounded,
+            ),
+          ),
+
+          Expanded(
+            child: Column(
+              children: [
+                Text(
+                  'Voucher / Page',
+                  style: TextStyle(
+                    color:
+                        AppTheme.textMuted,
+                    fontSize: 10,
+                  ),
+                ),
+
+                const SizedBox(height: 2),
+
+                Text(
+                  'পৃষ্ঠা ${_categoryPage + 1} / $totalPages',
+                  style: TextStyle(
+                    color:
+                        AppTheme.textPrimary,
+                    fontSize: 15,
+                    fontWeight:
+                        FontWeight.w900,
+                  ),
+                ),
+
+                const SizedBox(height: 2),
+
+                Text(
+                  '${_categoryTransactions.length}টি Transaction • প্রতি পৃষ্ঠায় সর্বোচ্চ ১০টি',
+                  textAlign:
+                      TextAlign.center,
+                  style: TextStyle(
+                    color:
+                        AppTheme.textMuted,
+                    fontSize: 9,
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          IconButton(
+            onPressed:
+                _categoryPage <
+                        totalPages - 1
+                    ? () {
+                        setState(() {
+                          _categoryPage++;
+                        });
+                      }
+                    : null,
+            icon: const Icon(
+              Icons.chevron_right_rounded,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ============================================================
+  // SAVE BUTTONS
+  // ============================================================
+
+  Widget _buildSaveButtons(
+    bool dark,
+  ) {
+    return Row(
+      children: [
+        Expanded(
+          child: ElevatedButton.icon(
+            onPressed:
+                _savingImage || _savingPdf
+                    ? null
+                    : _saveAsImage,
+            icon: _savingImage
+                ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child:
+                        CircularProgressIndicator(
+                      strokeWidth: 2,
+                    ),
+                  )
+                : const Icon(
+                    Icons.image_outlined,
+                  ),
+            label: Text(
+              _reportMode ==
+                      _ReportMode.category
+                  ? 'সব Page Image'
+                  : 'Save as Image',
+            ),
+            style:
+                ElevatedButton.styleFrom(
+              padding:
+                  const EdgeInsets.symmetric(
+                vertical: 15,
+              ),
+              backgroundColor: dark
+                  ? AppTheme.gold
+                  : AppTheme.darkGreen,
+              foregroundColor: dark
+                  ? Colors.black
+                  : Colors.white,
+              shape:
+                  RoundedRectangleBorder(
+                borderRadius:
+                    BorderRadius.circular(14),
+              ),
+            ),
+          ),
+        ),
+
+        const SizedBox(width: 10),
+
+        Expanded(
+          child: ElevatedButton.icon(
+            onPressed:
+                _savingImage || _savingPdf
+                    ? null
+                    : _saveAsPdf,
+            icon: _savingPdf
+                ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child:
+                        CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: Colors.white,
+                    ),
+                  )
+                : const Icon(
+                    Icons
+                        .picture_as_pdf_outlined,
+                  ),
+            label: Text(
+              _reportMode ==
+                      _ReportMode.category
+                  ? 'সব Page PDF'
+                  : 'Save as PDF',
+            ),
+            style:
+                ElevatedButton.styleFrom(
+              padding:
+                  const EdgeInsets.symmetric(
+                vertical: 15,
+              ),
+              backgroundColor:
+                  Colors.redAccent,
+              foregroundColor:
+                  Colors.white,
+              shape:
+                  RoundedRectangleBorder(
+                borderRadius:
+                    BorderRadius.circular(14),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  // ============================================================
+  // BUILD
+  // ============================================================
+
+  @override
+  Widget build(BuildContext context) {
+    final dark = AppTheme.isDark;
+
+    return Scaffold(
+      backgroundColor:
+          AppTheme.background,
+
+      appBar: AppBar(
+        title: Text(
+          'রিপোর্ট',
+          style: TextStyle(
+            color: dark
+                ? AppTheme.gold
+                : AppTheme.darkGreen,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+        actions: [
+          IconButton(
+            tooltip: 'Refresh',
+            onPressed: _loadReport,
+            icon: Icon(
+              Icons.refresh_rounded,
+              color: dark
+                  ? AppTheme.gold
+                  : AppTheme.darkGreen,
+            ),
+          ),
+        ],
+      ),
+
+      body: _loading
+          ? Center(
+              child:
+                  CircularProgressIndicator(
+                color: dark
+                    ? AppTheme.gold
+                    : AppTheme.darkGreen,
+              ),
+            )
+          : RefreshIndicator(
+              onRefresh: _loadReport,
+              color: dark
+                  ? AppTheme.gold
+                  : AppTheme.darkGreen,
+              child:
+                  SingleChildScrollView(
+                physics:
+                    const AlwaysScrollableScrollPhysics(),
+                padding:
+                    const EdgeInsets.fromLTRB(
+                  14,
+                  10,
+                  14,
+                  20,
+                ),
+                child: Column(
+                  children: [
+                    // Month
+                    _buildMonthSelector(
+                      Theme.of(context),
+                      dark,
+                    ),
+
+                    const SizedBox(height: 14),
+
+                    // Report mode
+                    _buildReportModeSelector(
+                      dark,
+                    ),
+
+                    const SizedBox(height: 14),
+
+                    if (_reportMode ==
+                        _ReportMode.monthly)
+                      _buildMonthlyReportBody(
+                        dark,
+                      )
+                    else
+                      _buildCategoryReportBody(
+                        dark,
+                      ),
+                  ],
+                ),
+              ),
+            ),
+    );
+  }
+
+  // ============================================================
+  // MONTHLY BODY
+  // ============================================================
+
+  Widget _buildMonthlyReportBody(
+    bool dark,
+  ) {
+    return Column(
+      children: [
+        Container(
+          width: double.infinity,
+          padding:
+              const EdgeInsets.all(8),
+          decoration:
+              BoxDecoration(
+            color: Colors.grey.shade200,
+            borderRadius:
+                BorderRadius.circular(12),
+          ),
+          child: FittedBox(
+            fit: BoxFit.fitWidth,
+            alignment:
+                Alignment.topCenter,
+            child: Screenshot(
+              controller:
+                  _screenshotController,
+              child:
+                  _buildA4Report(),
+            ),
+          ),
+        ),
+
+        const SizedBox(height: 18),
+
+        _buildSaveButtons(dark),
+
+        const SizedBox(height: 6),
+
+        Text(
+          'Image: A4 • Gallery-তে Save হবে',
+          style: TextStyle(
+            color: AppTheme.textMuted,
+            fontSize: 11,
+          ),
+        ),
+      ],
+    );
+  }
+
+  // ============================================================
+  // CATEGORY BODY
+  // ============================================================
+
+  Widget _buildCategoryReportBody(
+    bool dark,
+  ) {
+    return Column(
+      children: [
+        _buildCategoryControls(dark),
+
+        const SizedBox(height: 14),
+
+        if (_categoryTransactions.isEmpty)
+          Container(
+            width: double.infinity,
+            padding:
+                const EdgeInsets.symmetric(
+              vertical: 25,
+              horizontal: 15,
+            ),
+            decoration: BoxDecoration(
+              color: AppTheme.cardColor,
+              borderRadius:
+                  BorderRadius.circular(16),
+            ),
+            child: Column(
+              children: [
+                Icon(
+                  Icons
+                      .receipt_long_outlined,
+                  size: 42,
+                  color:
+                      AppTheme.textMuted,
+                ),
+
+                const SizedBox(height: 8),
+
+                Text(
+                  'এই মাসে এই খাতে কোনো Transaction নেই',
+                  textAlign:
+                      TextAlign.center,
+                  style: TextStyle(
+                    color:
+                        AppTheme.textPrimary,
+                    fontSize: 13,
+                    fontWeight:
+                        FontWeight.w700,
+                  ),
+                ),
+              ],
+            ),
+          )
+        else ...[
+          _buildPageNavigation(dark),
+
+          const SizedBox(height: 14),
+
+          Container(
+            width: double.infinity,
+            padding:
+                const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: Colors.grey.shade200,
+              borderRadius:
+                  BorderRadius.circular(12),
+            ),
+            child: FittedBox(
+              fit: BoxFit.fitWidth,
+              alignment:
+                  Alignment.topCenter,
+              child: Screenshot(
+                controller:
+                    _screenshotController,
+                child: _buildCategoryVoucher(
+                  transactions:
+                      _currentCategoryPageTransactions,
+                  pageIndex:
+                      _categoryPage,
+                  totalPages:
+                      _categoryPageCount,
+                ),
+              ),
+            ),
+          ),
+
+          const SizedBox(height: 18),
+
+          _buildSaveButtons(dark),
+
+          const SizedBox(height: 6),
+
+          Text(
+            'প্রতি Page-এ সর্বোচ্চ ১০টি Transaction • '
+            'সব Page আলাদা Image হিসেবে Gallery-তে Save হবে',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: AppTheme.textMuted,
+              fontSize: 10,
+            ),
+          ),
+        ],
+      ],
     );
   }
 }
